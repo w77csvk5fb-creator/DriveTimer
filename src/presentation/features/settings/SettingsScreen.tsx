@@ -6,6 +6,8 @@ import { driveHistoryRepository } from "@/data/repositories/driveHistoryReposito
 import type { DriveHistoryEntry } from "@/domain/entities/driveHistoryEntry";
 import { formatDateTimeJa, formatDurationJa, formatTimeJa } from "@/core/utils/durationFormatter";
 import { getRiskPresentation } from "@/presentation/components/riskLevelPresentation";
+import { FavoritesSettings } from "./FavoritesSettings";
+import { NotificationLeadTimeSettings } from "./NotificationLeadTimeSettings";
 
 export function SettingsScreen() {
   const [history, setHistory] = useState<readonly DriveHistoryEntry[] | null>(null);
@@ -83,6 +85,9 @@ export function SettingsScreen() {
           ))}
         </ul>
       </section>
+
+      <FavoritesSettings />
+      <NotificationLeadTimeSettings />
     </main>
   );
 }

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Noto_Sans_JP } from "next/font/google";
 import "./globals.css";
 import { RegisterServiceWorker } from "@/core/pwa/RegisterServiceWorker";
+import { FirebaseAuthBootstrap } from "@/presentation/providers/FirebaseAuthBootstrap";
 
 const notoSansJP = Noto_Sans_JP({
   variable: "--font-noto-sans-jp",
@@ -45,6 +46,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-surface-base text-on-surface">
         {children}
         <RegisterServiceWorker />
+        <FirebaseAuthBootstrap />
       </body>
     </html>
   );

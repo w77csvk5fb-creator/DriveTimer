@@ -98,4 +98,37 @@ describe("evaluateNotificationThresholds", () => {
     const backOnTrack = evaluateNotificationThresholds(onTrack(4), afterGuarantee);
     expect(backOnTrack.newlyFired.map((e) => e.id)).toEqual(["fiveMinWarning"]);
   });
+
+  describe("configurable notification lead times", () => {
+    it("does not fire the 15-minute warning when it is not in leadTimesMinutes", () => {
+      const result = evaluateNotificationThresholds(onTrack(14), noneFired, [5]);
+      expect(result.newlyFired).toHaveLength(0);
+    });
+
+    it("fires the 10-minute warning when 10 is included in leadTimesMinutes", () => {
+      const result = evaluateNotificationThresholds(onTrack(9), noneFired, [10, 5]);
+      expect(result.newlyFired.map((e) => e.id)).toEqual(["tenMinWarning"]);
+    });
+
+    it("still fires timeUp even when leadTimesMinutes is empty (0 minutes is never optional)", () => {
+      const result = evaluateNotificationThresholds(onTrack(-1), noneFired, []);
+      expect(result.newlyFired.map((e) => e.id)).toEqual(["timeUp"]);
+    });
+
+    it("only fires the enabled rungs as free time shrinks, skipping disabled ones silently", () => {
+      let fired: ReadonlySet<NotificationEventId> = noneFired;
+      const leadTimes = [5];
+
+      let r = evaluateNotificationThresholds(onTrack(14), fired, leadTimes);
+      expect(r.newlyFired).toHaveLength(0); // 15分は無効なので何も発火しない
+      fired = r.firedIds;
+
+      r = evaluateNotificationThresholds(onTrack(4), fired, leadTimes);
+      expect(r.newlyFired.map((e) => e.id)).toEqual(["fiveMinWarning"]);
+      fired = r.firedIds;
+
+      r = evaluateNotificationThresholds(onTrack(-1), fired, leadTimes);
+      expect(r.newlyFired.map((e) => e.id)).toEqual(["timeUp"]);
+    });
+  });
 });

@@ -2,6 +2,8 @@ import type { GeoPoint } from "@/domain/entities/geoPoint";
 import type {
   DirectionsRepository,
   EtaResult,
+  RouteDetail,
+  RouteViaWaypointOptions,
 } from "@/domain/repositories/directionsRepository";
 import { haversineDistanceMeters } from "@/core/utils/geoUtils";
 import { DEFAULT_AVG_CRUISE_SPEED_KMH } from "@/core/constants/appConstants";
@@ -40,5 +42,22 @@ export class SimulatedDirectionsRepository implements DirectionsRepository {
     const distanceMeters = haversineDistanceMeters(origin, destination);
     const durationMs = (distanceMeters / AVG_SPEED_MPS) * 1000;
     return { durationMs, distanceMeters };
+  }
+
+  /**
+   * インターフェースを満たすための簡易実装。シミュレーションモードには実際の道路・案内文
+   * データが無いため、景観カテゴリ判定に意味のある結果は返せない(steps:[])。
+   * 2区間(origin→waypoint, waypoint→destination)の直線距離を合算するだけの概算値。
+   */
+  async getRouteViaWaypoint(
+    origin: GeoPoint,
+    waypoint: GeoPoint,
+    destination: GeoPoint,
+    _options?: RouteViaWaypointOptions,
+  ): Promise<RouteDetail> {
+    const distanceMeters =
+      haversineDistanceMeters(origin, waypoint) + haversineDistanceMeters(waypoint, destination);
+    const durationMs = (distanceMeters / AVG_SPEED_MPS) * 1000;
+    return { durationMs, distanceMeters, steps: [] };
   }
 }

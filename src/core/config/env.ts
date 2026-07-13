@@ -11,9 +11,16 @@ function isConfigured(value: string | undefined): boolean {
 export const clientEnv = {
   googleMapsJsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_JS_API_KEY,
   firebaseApiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  firebaseAuthDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  firebaseProjectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
 } as const;
 
 export const isGoogleMapsConfigured = isConfigured(clientEnv.googleMapsJsApiKey);
+
+export const isFirebaseConfigured =
+  isConfigured(clientEnv.firebaseApiKey) &&
+  isConfigured(clientEnv.firebaseAuthDomain) &&
+  isConfigured(clientEnv.firebaseProjectId);
 
 /** サーバー(API Route)専用。クライアントバンドルには含まれない。 */
 export const serverEnv = {

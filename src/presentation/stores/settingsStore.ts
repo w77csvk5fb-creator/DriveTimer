@@ -1,38 +1,64 @@
 import { create } from "zustand";
-import { DEFAULT_SAFETY_BUFFER_MINUTES } from "@/core/constants/appConstants";
+import {
+  DEFAULT_NOTIFICATION_LEAD_TIMES_MINUTES,
+  DEFAULT_SAFETY_BUFFER_MINUTES,
+} from "@/core/constants/appConstants";
 
 const STORAGE_KEY = "drivetime.settings.v1";
 
 interface PersistedSettings {
   readonly safetyBufferMinutes: number;
+  readonly notificationLeadTimesMinutes: readonly number[];
 }
 
 function loadPersisted(): PersistedSettings {
-  if (typeof window === "undefined") {
-    return { safetyBufferMinutes: DEFAULT_SAFETY_BUFFER_MINUTES };
-  }
+  const fallback: PersistedSettings = {
+    safetyBufferMinutes: DEFAULT_SAFETY_BUFFER_MINUTES,
+    notificationLeadTimesMinutes: DEFAULT_NOTIFICATION_LEAD_TIMES_MINUTES,
+  };
+  if (typeof window === "undefined") return fallback;
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { safetyBufferMinutes: DEFAULT_SAFETY_BUFFER_MINUTES };
+    if (!raw) return fallback;
     const parsed = JSON.parse(raw) as Partial<PersistedSettings>;
-    return { safetyBufferMinutes: parsed.safetyBufferMinutes ?? DEFAULT_SAFETY_BUFFER_MINUTES };
+    return {
+      safetyBufferMinutes: parsed.safetyBufferMinutes ?? fallback.safetyBufferMinutes,
+      notificationLeadTimesMinutes:
+        parsed.notificationLeadTimesMinutes ?? fallback.notificationLeadTimesMinutes,
+    };
   } catch {
-    return { safetyBufferMinutes: DEFAULT_SAFETY_BUFFER_MINUTES };
+    return fallback;
   }
 }
 
 interface SettingsState {
   readonly safetyBufferMinutes: number;
+  readonly notificationLeadTimesMinutes: readonly number[];
   setSafetyBufferMinutes(minutes: number): void;
+  setNotificationLeadTimesMinutes(minutes: readonly number[]): void;
 }
 
-export const useSettingsStore = create<SettingsState>((set) => ({
+function persist(state: Pick<SettingsState, "safetyBufferMinutes" | "notificationLeadTimesMinutes">) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(
+    STORAGE_KEY,
+    JSON.stringify({
+      safetyBufferMinutes: state.safetyBufferMinutes,
+      notificationLeadTimesMinutes: state.notificationLeadTimesMinutes,
+    }),
+  );
+}
+
+export const useSettingsStore = create<SettingsState>((set, get) => ({
   safetyBufferMinutes: DEFAULT_SAFETY_BUFFER_MINUTES,
+  notificationLeadTimesMinutes: DEFAULT_NOTIFICATION_LEAD_TIMES_MINUTES,
   setSafetyBufferMinutes(minutes) {
     set({ safetyBufferMinutes: minutes });
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ safetyBufferMinutes: minutes }));
-    }
+    persist(get());
+  },
+  setNotificationLeadTimesMinutes(minutes) {
+    set({ notificationLeadTimesMinutes: minutes });
+    persist(get());
   },
 }));
 

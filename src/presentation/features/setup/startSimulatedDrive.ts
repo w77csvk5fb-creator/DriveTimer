@@ -3,6 +3,7 @@ import { SimulatedLocationDataSource } from "@/data/datasources/fake/simulatedLo
 import { SimulatedDirectionsRepository } from "@/data/datasources/fake/simulatedDirectionsRepository";
 import { DRIVE_SCENARIOS, type DriveScenarioId } from "@/data/datasources/fake/scenarios";
 import { useActiveDriveStore } from "@/presentation/stores/activeDriveStore";
+import { useSettingsStore } from "@/presentation/stores/settingsStore";
 import { driveHistoryRepository } from "@/data/repositories/driveHistoryRepositoryInstance";
 
 /** シミュレーションモードでドライブを開始する。GPS/Directionsをシナリオ駆動のFakeに差し替えるだけで、以降は本番と全く同じactiveDriveStoreのロジックが動く。 */
@@ -22,6 +23,7 @@ export function startSimulatedDrive(
     destination: scenario.destination,
     deadline,
     safetyBufferMinutes,
+    notificationLeadTimesMinutes: useSettingsStore.getState().notificationLeadTimesMinutes,
     locationRepository,
     directionsRepository,
     historyRepository: driveHistoryRepository,

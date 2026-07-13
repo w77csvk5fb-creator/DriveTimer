@@ -27,6 +27,7 @@ import {
   RECALC_DISTANCE_METERS,
   UI_TICK_INTERVAL_MS,
   ARRIVAL_DETECTION_RADIUS_METERS,
+  DEFAULT_NOTIFICATION_LEAD_TIMES_MINUTES,
 } from "@/core/constants/appConstants";
 
 export type DriveSessionPhase = "idle" | "active" | "ended";
@@ -35,6 +36,8 @@ export interface StartDriveParams {
   readonly destination: GeoPoint;
   readonly deadline: Date;
   readonly safetyBufferMinutes: number;
+  /** ユーザーが設定画面で選んだ有効な折り返し通知タイミング（分）。省略時は既定値。 */
+  readonly notificationLeadTimesMinutes?: readonly number[];
   readonly locationRepository: LocationRepository;
   readonly directionsRepository: DirectionsRepository;
   readonly historyRepository: DriveHistoryRepository;
@@ -80,6 +83,7 @@ interface InternalRuntime {
   directionsRepository: DirectionsRepository | null;
   historyRepository: DriveHistoryRepository | null;
   nowProvider: (() => Date) | null;
+  notificationLeadTimesMinutes: readonly number[];
   sessionStartedAt: Date | null;
   freeTimeAtStartMs: number | null;
   maxRiskLevel: RiskLevel;
@@ -107,6 +111,7 @@ const runtime: InternalRuntime = {
   directionsRepository: null,
   historyRepository: null,
   nowProvider: null,
+  notificationLeadTimesMinutes: DEFAULT_NOTIFICATION_LEAD_TIMES_MINUTES,
   sessionStartedAt: null,
   freeTimeAtStartMs: null,
   maxRiskLevel: "safe",
@@ -137,6 +142,7 @@ function resetSessionRuntime() {
   runtime.directionsRepository = null;
   runtime.historyRepository = null;
   runtime.nowProvider = null;
+  runtime.notificationLeadTimesMinutes = DEFAULT_NOTIFICATION_LEAD_TIMES_MINUTES;
   runtime.sessionStartedAt = null;
   runtime.freeTimeAtStartMs = null;
   runtime.maxRiskLevel = "safe";
@@ -205,6 +211,8 @@ export const useActiveDriveStore = create<ActiveDriveState>((set, get) => ({
     runtime.directionsRepository = params.directionsRepository;
     runtime.historyRepository = params.historyRepository;
     runtime.nowProvider = params.now;
+    runtime.notificationLeadTimesMinutes =
+      params.notificationLeadTimesMinutes ?? DEFAULT_NOTIFICATION_LEAD_TIMES_MINUTES;
     runtime.sessionStartedAt = params.now();
 
     void wakeLockController.request().then((acquired) => {
@@ -248,6 +256,7 @@ export const useActiveDriveStore = create<ActiveDriveState>((set, get) => ({
       const { newlyFired, firedIds } = evaluateNotificationThresholds(
         status,
         get().firedNotificationIds,
+        runtime.notificationLeadTimesMinutes,
       );
 
       for (const event of newlyFired) {

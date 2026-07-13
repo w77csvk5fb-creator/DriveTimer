@@ -1,10 +1,23 @@
 import type { GeoPoint } from "@/domain/entities/geoPoint";
-import type { DirectionsRepository, EtaResult } from "@/domain/repositories/directionsRepository";
+import type {
+  DirectionsRepository,
+  EtaResult,
+  RouteDetail,
+  RouteStepSummary,
+  RouteViaWaypointOptions,
+} from "@/domain/repositories/directionsRepository";
+
+interface DirectionsApiStep {
+  readonly html_instructions?: string;
+  readonly duration?: { readonly value: number };
+  readonly distance?: { readonly value: number };
+}
 
 interface DirectionsApiLeg {
   readonly duration?: { readonly value: number };
   readonly duration_in_traffic?: { readonly value: number };
   readonly distance?: { readonly value: number };
+  readonly steps?: readonly DirectionsApiStep[];
 }
 
 interface DirectionsApiRoute {
@@ -20,14 +33,31 @@ function toLatLngParam(point: GeoPoint): string {
   return `${point.lat},${point.lng}`;
 }
 
+function stripHtmlTags(html: string): string {
+  return html.replace(/<[^>]+>/g, "");
+}
+
+interface FetchDirectionsOptions {
+  readonly waypoint?: GeoPoint;
+  readonly avoidHighways?: boolean;
+}
+
 async function fetchDirections(
   origin: GeoPoint,
   destination: GeoPoint,
+  options?: FetchDirectionsOptions,
 ): Promise<DirectionsApiResponse> {
   const params = new URLSearchParams({
     origin: toLatLngParam(origin),
     destination: toLatLngParam(destination),
   });
+  if (options?.waypoint) {
+    params.set("waypoint", toLatLngParam(options.waypoint));
+  }
+  if (options?.avoidHighways) {
+    params.set("avoidHighways", "1");
+  }
+
   const response = await fetch(`/api/directions?${params.toString()}`);
   if (!response.ok) {
     throw new Error(`directions request failed with status ${response.status}`);
@@ -49,6 +79,20 @@ function extractEta(data: DirectionsApiResponse): EtaResult {
   return { durationMs, distanceMeters };
 }
 
+function extractRouteDetail(data: DirectionsApiResponse): RouteDetail {
+  const leg = data.routes?.[0]?.legs?.[0];
+  if (!leg) {
+    throw new Error("no route found in directions response");
+  }
+  const eta = extractEta(data);
+  const steps: RouteStepSummary[] = (leg.steps ?? []).map((step) => ({
+    instructionText: stripHtmlTags(step.html_instructions ?? ""),
+    durationMs: (step.duration?.value ?? 0) * 1000,
+    distanceMeters: step.distance?.value ?? 0,
+  }));
+  return { ...eta, steps };
+}
+
 /** /api/directions プロキシ経由でGoogle Directions APIを呼ぶ本番実装。 */
 export class RemoteDirectionsRepository implements DirectionsRepository {
   async getTrafficAwareEta(origin: GeoPoint, destination: GeoPoint): Promise<EtaResult> {
@@ -57,5 +101,19 @@ export class RemoteDirectionsRepository implements DirectionsRepository {
 
   async getFastestRoute(origin: GeoPoint, destination: GeoPoint): Promise<EtaResult> {
     return extractEta(await fetchDirections(origin, destination));
+  }
+
+  async getRouteViaWaypoint(
+    origin: GeoPoint,
+    waypoint: GeoPoint,
+    destination: GeoPoint,
+    options?: RouteViaWaypointOptions,
+  ): Promise<RouteDetail> {
+    return extractRouteDetail(
+      await fetchDirections(origin, destination, {
+        waypoint,
+        avoidHighways: options?.avoidHighways,
+      }),
+    );
   }
 }

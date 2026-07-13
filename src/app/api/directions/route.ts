@@ -34,6 +34,16 @@ export async function GET(request: NextRequest) {
   url.searchParams.set("language", "ja");
   url.searchParams.set("key", serverEnv.googleDirectionsApiKey as string);
 
+  // 景観ルート提案用: waypointを"via:"接頭辞付きで渡すことで、経由地扱い(2レグに分割)ではなく
+  // 単一ルート・単一legのまま通過点として扱わせる（既存コードのlegs[0]前提を壊さないため重要）。
+  const waypoint = request.nextUrl.searchParams.get("waypoint");
+  if (waypoint) {
+    url.searchParams.set("waypoints", `via:${waypoint}`);
+  }
+  if (request.nextUrl.searchParams.get("avoidHighways") === "1") {
+    url.searchParams.set("avoid", "highways");
+  }
+
   const response = await fetch(url.toString());
   if (!response.ok) {
     return NextResponse.json({ error: "directions_api_error" }, { status: 502 });

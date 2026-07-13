@@ -63,4 +63,50 @@ describe("GET /api/directions", () => {
     );
     expect(response.status).toBe(502);
   });
+
+  it("forwards a waypoint using the via: prefix (single-leg route, not a stopover)", async () => {
+    process.env.GOOGLE_DIRECTIONS_API_KEY = "real-key";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify({ status: "OK", routes: [] }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await callRoute(
+      "http://localhost:3000/api/directions?origin=35.6,139.7&destination=35.7,139.8&waypoint=35.65,139.75",
+    );
+
+    const calledUrl = new URL(fetchMock.mock.calls[0][0] as string);
+    expect(calledUrl.searchParams.get("waypoints")).toBe("via:35.65,139.75");
+  });
+
+  it("forwards avoid=highways when avoidHighways=1", async () => {
+    process.env.GOOGLE_DIRECTIONS_API_KEY = "real-key";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify({ status: "OK", routes: [] }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await callRoute(
+      "http://localhost:3000/api/directions?origin=35.6,139.7&destination=35.7,139.8&avoidHighways=1",
+    );
+
+    const calledUrl = new URL(fetchMock.mock.calls[0][0] as string);
+    expect(calledUrl.searchParams.get("avoid")).toBe("highways");
+  });
+
+  it("does not set waypoints or avoid params when not requested", async () => {
+    process.env.GOOGLE_DIRECTIONS_API_KEY = "real-key";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify({ status: "OK", routes: [] }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await callRoute(
+      "http://localhost:3000/api/directions?origin=35.6,139.7&destination=35.7,139.8",
+    );
+
+    const calledUrl = new URL(fetchMock.mock.calls[0][0] as string);
+    expect(calledUrl.searchParams.has("waypoints")).toBe(false);
+    expect(calledUrl.searchParams.has("avoid")).toBe(false);
+  });
 });
