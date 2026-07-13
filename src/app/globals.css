@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+/*
+ * DriveTime はダークテーマ固定（ライトモード切替なし）。
+ * トヨタ/レクサス/ポルシェのナビ画面を意識した、黒基調で運転中でも
+ * 一目で見やすい配色トークンをここに集約する。
+ */
+:root {
+  --surface-base: #0b0c0e;
+  --surface-raised-1: #17181b;
+  --surface-raised-2: #202226;
+  --on-surface: #f2f2f0;
+  --on-surface-muted: #9a9ca3;
+  --outline: #2a2c31;
+  --accent-primary: #4c7093;
+  --accent-info: #5c9ead;
+  --accent-caution: #d9c24c;
+  --accent-warning: #e0a733;
+  --accent-urgent: #d8232a;
+  --accent-safe: #4c9a6a;
+}
+
+@theme inline {
+  --color-surface-base: var(--surface-base);
+  --color-surface-raised-1: var(--surface-raised-1);
+  --color-surface-raised-2: var(--surface-raised-2);
+  --color-on-surface: var(--on-surface);
+  --color-on-surface-muted: var(--on-surface-muted);
+  --color-outline: var(--outline);
+  --color-accent-primary: var(--accent-primary);
+  --color-accent-info: var(--accent-info);
+  --color-accent-caution: var(--accent-caution);
+  --color-accent-warning: var(--accent-warning);
+  --color-accent-urgent: var(--accent-urgent);
+  --color-accent-safe: var(--accent-safe);
+  --font-sans: var(--font-noto-sans-jp);
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--surface-base);
+  color: var(--on-surface);
+}
