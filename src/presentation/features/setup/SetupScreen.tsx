@@ -12,7 +12,7 @@ import { FavoriteDestinationPicker } from "./FavoriteDestinationPicker";
 import { SaveFavoriteButton } from "./SaveFavoriteButton";
 import { RouteCard } from "./RouteCard";
 import { useSettingsStore } from "@/presentation/stores/settingsStore";
-import { isDeadlineInPast, resolveDeadlineForToday } from "@/domain/services/deadlineResolver";
+import { resolveUpcomingDeadline } from "@/domain/services/deadlineResolver";
 import type { DriveScenarioId } from "@/data/datasources/fake/scenarios";
 import { getCurrentPositionOnce } from "@/data/datasources/browser/getCurrentPositionOnce";
 import { RemoteDirectionsRepository } from "@/data/datasources/remote/directionsClient";
@@ -28,11 +28,9 @@ function defaultDeadlineValue(): string {
   return `${hh}:${mm}`;
 }
 
-function parseValidDeadline(deadlineValue: string): Date | null {
+function parseDeadline(deadlineValue: string): Date {
   const [hoursStr, minutesStr] = deadlineValue.split(":");
-  const deadline = resolveDeadlineForToday(Number(hoursStr), Number(minutesStr), new Date());
-  if (isDeadlineInPast(deadline, new Date())) return null;
-  return deadline;
+  return resolveUpcomingDeadline(Number(hoursStr), Number(minutesStr), new Date());
 }
 
 export function SetupScreen() {
@@ -69,11 +67,7 @@ export function SetupScreen() {
       setError("目的地を選択してください。");
       return;
     }
-    const deadline = parseValidDeadline(deadlineValue);
-    if (!deadline) {
-      setError("到着時刻は現在時刻より後にしてください。");
-      return;
-    }
+    const deadline = parseDeadline(deadlineValue);
 
     // 景観ルート提案(selectedCandidateId)はあくまで一度きりの提案であり、
     // 走行中のライブ安全計算(activeDriveStore)には一切組み込まない。
@@ -83,11 +77,7 @@ export function SetupScreen() {
 
   const handleGenerateScenicRoutes = async () => {
     if (!destination) return;
-    const deadline = parseValidDeadline(deadlineValue);
-    if (!deadline) {
-      setError("到着時刻は現在時刻より後にしてください。");
-      return;
-    }
+    const deadline = parseDeadline(deadlineValue);
 
     setError(null);
     setScenicError(null);
