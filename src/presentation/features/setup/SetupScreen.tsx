@@ -146,7 +146,10 @@ export function SetupScreen() {
         <>
           <section className="flex flex-col gap-4 rounded-2xl border border-outline bg-surface-raised-1 p-4">
             <FavoriteDestinationPicker onSelect={setDestination} />
-            <DestinationSearchField onSelect={setDestination} />
+            <DestinationSearchField
+              onSelect={setDestination}
+              selectedDestinationName={destination?.name}
+            />
             <SaveFavoriteButton destination={destination} />
             <DeadlineInput value={deadlineValue} onChange={setDeadlineValue} />
           </section>

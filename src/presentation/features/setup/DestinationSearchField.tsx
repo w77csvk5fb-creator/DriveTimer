@@ -29,23 +29,37 @@ interface PlaceDetailsResponse {
 
 interface DestinationSearchFieldProps {
   readonly onSelect: (destination: SelectedDestination) => void;
+  /** お気に入り等、検索以外の経路で選択された目的地名。検索欄の表示に反映する。 */
+  readonly selectedDestinationName?: string;
 }
 
 /** Google Places API (New) を /api/places プロキシ経由で叩く目的地検索フィールド。 */
-export function DestinationSearchField({ onSelect }: DestinationSearchFieldProps) {
+export function DestinationSearchField({
+  onSelect,
+  selectedDestinationName,
+}: DestinationSearchFieldProps) {
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState<readonly Suggestion[]>([]);
   const [notConfigured, setNotConfigured] = useState(false);
   const [loading, setLoading] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const suppressNextSearchRef = useRef(false);
+  // 選択確定によりqueryを表示名へ書き換えた際、それを新規検索としては扱わないための目印
+  const [lastSelectedName, setLastSelectedName] = useState<string | undefined>(undefined);
+  const [syncedName, setSyncedName] = useState(selectedDestinationName);
+
+  if (selectedDestinationName !== syncedName) {
+    setSyncedName(selectedDestinationName);
+    if (selectedDestinationName !== undefined && selectedDestinationName !== query) {
+      setLastSelectedName(selectedDestinationName);
+      setQuery(selectedDestinationName);
+      setSuggestions([]);
+    }
+  }
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
-    if (suppressNextSearchRef.current) {
-      // 選択確定時にqueryを表示名へ書き換えるが、それを新規検索としては扱わない
-      suppressNextSearchRef.current = false;
+    if (query === lastSelectedName) {
       return;
     }
 
@@ -82,7 +96,7 @@ export function DestinationSearchField({ onSelect }: DestinationSearchFieldProps
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [query]);
+  }, [query, lastSelectedName]);
 
   const handleSelect = async (suggestion: Suggestion) => {
     setLoading(true);
@@ -93,7 +107,7 @@ export function DestinationSearchField({ onSelect }: DestinationSearchFieldProps
       if (!data.location) return;
       const name = data.displayName?.text ?? suggestion.text;
       onSelect({ name, point: { lat: data.location.latitude, lng: data.location.longitude } });
-      suppressNextSearchRef.current = true;
+      setLastSelectedName(name);
       setQuery(name);
       setSuggestions([]);
     } finally {
