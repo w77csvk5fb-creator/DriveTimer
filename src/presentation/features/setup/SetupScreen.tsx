@@ -11,9 +11,11 @@ import { startRealDrive } from "./startRealDrive";
 import { FavoriteDestinationPicker } from "./FavoriteDestinationPicker";
 import { SaveFavoriteButton } from "./SaveFavoriteButton";
 import { RouteCard } from "./RouteCard";
+import { MapView } from "@/presentation/components/MapView";
 import { useSettingsStore } from "@/presentation/stores/settingsStore";
 import { resolveUpcomingDeadline } from "@/domain/services/deadlineResolver";
 import type { DriveScenarioId } from "@/data/datasources/fake/scenarios";
+import type { GeoPoint } from "@/domain/entities/geoPoint";
 import { getCurrentPositionOnce } from "@/data/datasources/browser/getCurrentPositionOnce";
 import { RemoteDirectionsRepository } from "@/data/datasources/remote/directionsClient";
 import {
@@ -53,6 +55,7 @@ export function SetupScreen() {
   const [scenicLoading, setScenicLoading] = useState(false);
   const [scenicError, setScenicError] = useState<string | null>(null);
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
+  const [scenicOrigin, setScenicOrigin] = useState<GeoPoint | null>(null);
 
   const handleStart = () => {
     setError(null);
@@ -86,6 +89,7 @@ export function SetupScreen() {
     setSelectedCandidateId(null);
     try {
       const currentPosition = await getCurrentPositionOnce();
+      setScenicOrigin(currentPosition);
       const result = await generateScenicRouteCandidates({
         directionsRepository: new RemoteDirectionsRepository(),
         origin: currentPosition,
@@ -181,15 +185,26 @@ export function SetupScreen() {
                       candidate={candidate}
                       directDurationMs={scenicResult.directDurationMs}
                       selected={selectedCandidateId === candidate.id}
-                      onSelect={() => {
-                        setSelectedCandidateId(candidate.id);
-                        handleStart();
-                      }}
+                      onSelect={() => setSelectedCandidateId(candidate.id)}
                     />
                   ))}
+
+                  {selectedCandidateId && (
+                    <div className="flex h-56">
+                      <MapView
+                        currentPosition={scenicOrigin}
+                        destination={destination.point}
+                        waypoint={
+                          scenicResult.candidates.find((c) => c.id === selectedCandidateId)
+                            ?.waypoint ?? null
+                        }
+                      />
+                    </div>
+                  )}
+
                   <p className="text-xs text-on-surface-muted">
                     ※
-                    ルートを選択するとすぐに出発します（参考提案のルート自体は出発時のルートに反映されません。安全計算は常に現在地基準で行われます）。
+                    表示は参考のルートプレビューです（出発時のルートには反映されません。安全計算は常に現在地基準で行われます）。選択後、下の「出発」ボタンを押すとドライブを開始します。
                   </p>
                 </div>
               )}

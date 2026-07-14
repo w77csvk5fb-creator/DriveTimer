@@ -8,6 +8,8 @@ import { clientEnv, isGoogleMapsConfigured } from "@/core/config/env";
 interface MapViewProps {
   readonly currentPosition: GeoPoint | null;
   readonly destination: GeoPoint | null;
+  /** 指定時、経由地マーカーを表示し、3点が収まるよう表示範囲を自動調整する(ルートプレビュー用)。 */
+  readonly waypoint?: GeoPoint | null;
 }
 
 // トヨタ/レクサス的な黒基調ナビ画面に寄せたダークスタイル。
@@ -30,11 +32,12 @@ function ensureMapsApiOptions(): void {
 }
 
 /** Google Maps JavaScript APIで現在地・目的地を表示する。キー未設定時はプレースホルダーを表示する。 */
-export function MapView({ currentPosition, destination }: MapViewProps) {
+export function MapView({ currentPosition, destination, waypoint }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
   const currentMarkerRef = useRef<google.maps.Marker | null>(null);
   const destinationMarkerRef = useRef<google.maps.Marker | null>(null);
+  const waypointMarkerRef = useRef<google.maps.Marker | null>(null);
 
   useEffect(() => {
     if (!isGoogleMapsConfigured || !containerRef.current) return;
@@ -80,6 +83,35 @@ export function MapView({ currentPosition, destination }: MapViewProps) {
       title: "目的地",
     });
   }, [destination]);
+
+  useEffect(() => {
+    if (!mapRef.current) return;
+    if (!waypoint) {
+      waypointMarkerRef.current?.setMap(null);
+      waypointMarkerRef.current = null;
+      return;
+    }
+    if (!waypointMarkerRef.current) {
+      waypointMarkerRef.current = new google.maps.Marker({
+        map: mapRef.current,
+        position: waypoint,
+        label: "経由",
+        title: "経由地",
+      });
+    } else {
+      waypointMarkerRef.current.setPosition(waypoint);
+    }
+  }, [waypoint]);
+
+  // ルートプレビュー用: 経由地がある間は現在地・経由地・目的地の3点が収まるよう表示範囲を合わせる
+  useEffect(() => {
+    if (!mapRef.current || !waypoint) return;
+    const bounds = new google.maps.LatLngBounds();
+    bounds.extend(waypoint);
+    if (currentPosition) bounds.extend(currentPosition);
+    if (destination) bounds.extend(destination);
+    mapRef.current.fitBounds(bounds, 32);
+  }, [waypoint, currentPosition, destination]);
 
   if (!isGoogleMapsConfigured) {
     return (
