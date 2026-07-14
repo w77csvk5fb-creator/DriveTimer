@@ -22,11 +22,13 @@ export function SaveFavoriteButton({ destination }: SaveFavoriteButtonProps) {
   const [customLabelText, setCustomLabelText] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   if (!isFirebaseConfigured || !destination) return null;
 
   const handleSave = async (label: FavoriteLabel, customLabel: string | null) => {
     setSaving(true);
+    setError(null);
     try {
       await favoriteDestinationRepository.saveFavorite({
         label,
@@ -37,6 +39,8 @@ export function SaveFavoriteButton({ destination }: SaveFavoriteButtonProps) {
       });
       setSaved(true);
       setOpen(false);
+    } catch {
+      setError("保存に失敗しました。もう一度お試しください。");
     } finally {
       setSaving(false);
     }
@@ -91,6 +95,7 @@ export function SaveFavoriteButton({ destination }: SaveFavoriteButtonProps) {
           保存
         </button>
       </div>
+      {error && <p className="text-xs text-accent-urgent">{error}</p>}
       <button
         type="button"
         onClick={() => setOpen(false)}

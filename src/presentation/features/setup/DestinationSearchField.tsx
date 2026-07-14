@@ -38,9 +38,16 @@ export function DestinationSearchField({ onSelect }: DestinationSearchFieldProps
   const [notConfigured, setNotConfigured] = useState(false);
   const [loading, setLoading] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const suppressNextSearchRef = useRef(false);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    if (suppressNextSearchRef.current) {
+      // 選択確定時にqueryを表示名へ書き換えるが、それを新規検索としては扱わない
+      suppressNextSearchRef.current = false;
+      return;
+    }
 
     if (query.trim().length < 2) {
       return;
@@ -86,6 +93,7 @@ export function DestinationSearchField({ onSelect }: DestinationSearchFieldProps
       if (!data.location) return;
       const name = data.displayName?.text ?? suggestion.text;
       onSelect({ name, point: { lat: data.location.latitude, lng: data.location.longitude } });
+      suppressNextSearchRef.current = true;
       setQuery(name);
       setSuggestions([]);
     } finally {

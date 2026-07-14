@@ -49,3 +49,6 @@ next-env.d.ts
 
 # local dev tooling (machine-specific absolute paths, session state)
 /.claude/
+
+.vercel
+.env*

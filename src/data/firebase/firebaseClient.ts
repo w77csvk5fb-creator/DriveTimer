@@ -53,6 +53,11 @@ export function ensureAnonymousAuth(): Promise<string | null> {
 
   anonAuthPromise ??= signInAnonymously(auth)
     .then((credential) => credential.user.uid)
-    .catch(() => null);
+    .catch(() => {
+      // 失敗を永続的にキャッシュしない。認証プロバイダが後から有効化された場合などに
+      // 次回呼び出しでリトライできるようにする。
+      anonAuthPromise = null;
+      return null;
+    });
   return anonAuthPromise;
 }
