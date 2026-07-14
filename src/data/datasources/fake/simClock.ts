@@ -2,7 +2,7 @@
  * シミュレーションモード用の仮想時計。
  * simNow = simStart + 実経過時間 × speedMultiplier
  * UIティッカー・再計算ティッカーは実時間のまま動かし、内部で読む「現在時刻」だけを
- * このクロック経由の値に置き換えることで速度倍率(×1/×2/×5/×10)を実現する。
+ * このクロック経由の値に置き換えることで任意の速度倍率(SIMULATION_SPEED_MULTIPLIERS参照)を実現する。
  */
 export interface SimClockOptions {
   readonly simStart: Date;

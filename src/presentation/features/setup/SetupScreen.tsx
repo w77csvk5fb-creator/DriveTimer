@@ -40,7 +40,7 @@ export function SetupScreen() {
   const safetyBufferMinutes = useSettingsStore((s) => s.safetyBufferMinutes);
   const setSafetyBufferMinutes = useSettingsStore((s) => s.setSafetyBufferMinutes);
 
-  const [simulationMode, setSimulationMode] = useState(true);
+  const [simulationMode, setSimulationMode] = useState(false);
   const [scenarioId, setScenarioId] = useState<DriveScenarioId>("normal");
   const [speed, setSpeed] = useState(5);
 
@@ -191,11 +191,15 @@ export function SetupScreen() {
                       candidate={candidate}
                       directDurationMs={scenicResult.directDurationMs}
                       selected={selectedCandidateId === candidate.id}
-                      onSelect={() => setSelectedCandidateId(candidate.id)}
+                      onSelect={() => {
+                        setSelectedCandidateId(candidate.id);
+                        handleStart();
+                      }}
                     />
                   ))}
                   <p className="text-xs text-on-surface-muted">
-                    ※ 提案は参考です。この選択は出発時のルートに反映されません（安全計算は常に現在地基準で行われます）。
+                    ※
+                    ルートを選択するとすぐに出発します（参考提案のルート自体は出発時のルートに反映されません。安全計算は常に現在地基準で行われます）。
                   </p>
                 </div>
               )}
