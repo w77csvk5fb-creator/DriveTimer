@@ -42,7 +42,7 @@ export function SetupScreen() {
 
   const [simulationMode, setSimulationMode] = useState(false);
   const [scenarioId, setScenarioId] = useState<DriveScenarioId>("normal");
-  const [speed, setSpeed] = useState(5);
+  const [speed, setSpeed] = useState(1);
 
   const [destination, setDestination] = useState<SelectedDestination | null>(null);
   const [deadlineValue, setDeadlineValue] = useState(defaultDeadlineValue());

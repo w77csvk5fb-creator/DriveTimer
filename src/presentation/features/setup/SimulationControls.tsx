@@ -33,7 +33,7 @@ export function SimulationControls({
           </button>
         ))}
       </div>
-      <div className="flex items-center gap-2 text-sm text-on-surface-muted">
+      <div className="flex flex-wrap items-center gap-2 text-sm text-on-surface-muted">
         <span>速度</span>
         {SIMULATION_SPEED_MULTIPLIERS.map((mult) => (
           <button

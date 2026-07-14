@@ -43,7 +43,7 @@ export const NOTIFICATION_LEAD_TIME_OPTIONS_MINUTES = [15, 10, 5] as const;
 export const DEFAULT_NOTIFICATION_LEAD_TIMES_MINUTES: readonly number[] = [15, 5];
 
 /** シミュレーションモードの再生速度倍率の選択肢 */
-export const SIMULATION_SPEED_MULTIPLIERS = [1, 2, 5, 10, 25, 50, 100] as const;
+export const SIMULATION_SPEED_MULTIPLIERS = [1, 100, 500, 1000] as const;
 
 /** localStorageに保持するドライブ履歴の最大件数（FIFOで超過分を削除） */
 export const DRIVE_HISTORY_MAX_ENTRIES = 10;
