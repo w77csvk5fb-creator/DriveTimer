@@ -8,6 +8,8 @@ import type { SelectedDestination } from "./DestinationSearchField";
 
 interface SaveFavoriteButtonProps {
   readonly destination: SelectedDestination | null;
+  /** 保存成功時に呼ばれる(お気に入り一覧の再取得トリガー用)。 */
+  readonly onSaved?: () => void;
 }
 
 const LABEL_OPTIONS: ReadonlyArray<{ label: FavoriteLabel; text: string }> = [
@@ -17,7 +19,7 @@ const LABEL_OPTIONS: ReadonlyArray<{ label: FavoriteLabel; text: string }> = [
 ];
 
 /** 選択中の目的地を自宅/学校/職場/カスタム名でお気に入り登録するボタン。 */
-export function SaveFavoriteButton({ destination }: SaveFavoriteButtonProps) {
+export function SaveFavoriteButton({ destination, onSaved }: SaveFavoriteButtonProps) {
   const [open, setOpen] = useState(false);
   const [customLabelText, setCustomLabelText] = useState("");
   const [saving, setSaving] = useState(false);
@@ -39,6 +41,7 @@ export function SaveFavoriteButton({ destination }: SaveFavoriteButtonProps) {
       });
       setSaved(true);
       setOpen(false);
+      onSaved?.();
     } catch {
       setError("保存に失敗しました。もう一度お試しください。");
     } finally {

@@ -14,15 +14,17 @@ const PRESET_LABELS: ReadonlyArray<{ label: FavoriteLabel; text: string }> = [
 
 interface FavoriteDestinationPickerProps {
   readonly onSelect: (destination: SelectedDestination) => void;
+  /** この値が変わるたびにお気に入り一覧を再取得する(新規保存後の反映用)。 */
+  readonly refreshKey?: number;
 }
 
-export function FavoriteDestinationPicker({ onSelect }: FavoriteDestinationPickerProps) {
+export function FavoriteDestinationPicker({ onSelect, refreshKey }: FavoriteDestinationPickerProps) {
   const [favorites, setFavorites] = useState<readonly FavoriteDestination[] | null>(null);
 
   useEffect(() => {
     if (!isFirebaseConfigured) return;
     void favoriteDestinationRepository.listFavorites().then(setFavorites);
-  }, []);
+  }, [refreshKey]);
 
   if (!isFirebaseConfigured) {
     return (

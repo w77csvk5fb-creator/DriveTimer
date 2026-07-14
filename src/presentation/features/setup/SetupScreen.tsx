@@ -47,6 +47,7 @@ export function SetupScreen() {
   const [destination, setDestination] = useState<SelectedDestination | null>(null);
   const [deadlineValue, setDeadlineValue] = useState(defaultDeadlineValue());
   const [error, setError] = useState<string | null>(null);
+  const [favoritesRefreshKey, setFavoritesRefreshKey] = useState(0);
 
   const [scenicResult, setScenicResult] = useState<GenerateScenicRouteCandidatesResult | null>(
     null,
@@ -145,12 +146,15 @@ export function SetupScreen() {
       ) : (
         <>
           <section className="flex flex-col gap-4 rounded-2xl border border-outline bg-surface-raised-1 p-4">
-            <FavoriteDestinationPicker onSelect={setDestination} />
+            <FavoriteDestinationPicker onSelect={setDestination} refreshKey={favoritesRefreshKey} />
             <DestinationSearchField
               onSelect={setDestination}
               selectedDestinationName={destination?.name}
             />
-            <SaveFavoriteButton destination={destination} />
+            <SaveFavoriteButton
+              destination={destination}
+              onSaved={() => setFavoritesRefreshKey((k) => k + 1)}
+            />
             <DeadlineInput value={deadlineValue} onChange={setDeadlineValue} />
           </section>
 
