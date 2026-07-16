@@ -1,6 +1,9 @@
 import type { GeoPoint } from "@/domain/entities/geoPoint";
 import type { DriveStatus } from "@/domain/entities/driveStatus";
-import type { DirectionsRepository, EtaResult } from "@/domain/repositories/directionsRepository";
+import type {
+  DirectionsRepository,
+  RouteDetail,
+} from "@/domain/repositories/directionsRepository";
 import { computeDriveStatus } from "@/domain/services/turnBackCalculator";
 
 export interface ComputeLiveTurnBackStatusParams {
@@ -14,7 +17,7 @@ export interface ComputeLiveTurnBackStatusParams {
 
 export interface ComputeLiveTurnBackStatusResult {
   readonly status: DriveStatus;
-  readonly eta: EtaResult;
+  readonly eta: RouteDetail;
 }
 
 /**

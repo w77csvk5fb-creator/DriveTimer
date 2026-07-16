@@ -16,6 +16,8 @@ interface MapViewProps {
   readonly destination: GeoPoint | null;
   /** 指定時、経由地マーカーを表示し、3点が収まるよう表示範囲を自動調整する(ルートプレビュー用)。 */
   readonly waypoint?: GeoPoint | null;
+  /** エンコード済みポリライン。指定時、現在地から目的地までの経路を線で描画する。 */
+  readonly routePolyline?: string | null;
 }
 
 // トヨタ/レクサス的な黒基調ナビ画面に寄せたダークスタイル。
@@ -38,13 +40,20 @@ function ensureMapsApiOptions(): void {
 }
 
 /** Google Maps JavaScript APIで現在地・目的地を表示する。キー未設定時はプレースホルダーを表示する。 */
-export function MapView({ currentPosition, destination, waypoint }: MapViewProps) {
+export function MapView({
+  currentPosition,
+  destination,
+  waypoint,
+  routePolyline,
+}: MapViewProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
   const currentMarkerRef = useRef<google.maps.Marker | null>(null);
   const destinationMarkerRef = useRef<google.maps.Marker | null>(null);
   const waypointMarkerRef = useRef<google.maps.Marker | null>(null);
+  const polylineRef = useRef<google.maps.Polyline | null>(null);
   const lastHeadingPositionRef = useRef<GeoPoint | null>(null);
+  const lastHeadingRef = useRef(0);
   // 地図オブジェクトの生成は非同期。生成完了前にdestination等が確定済みだと、
   // それらのprop自体は二度と変化せず対応するeffectが再実行されないままになるため、
   // 生成完了を状態として持ち、他の全effectの依存配列に加えて再評価を強制する。
@@ -77,7 +86,8 @@ export function MapView({ currentPosition, destination, waypoint }: MapViewProps
     if (!mapRef.current || !currentPosition) return;
     mapRef.current.panTo(currentPosition);
 
-    // 実ナビ同様、走行中(プレビューではない)は現在地に寄って進行方向へ回転させる
+    // 実ナビ同様、走行中(プレビューではない)は現在地に寄って進行方向へ回転させ、
+    // 現在地マーカーも進行方向を指す矢印にする
     if (!waypoint) {
       mapRef.current.setZoom(FOLLOW_ZOOM);
       mapRef.current.setTilt(FOLLOW_TILT);
@@ -86,9 +96,32 @@ export function MapView({ currentPosition, destination, waypoint }: MapViewProps
         lastPosition &&
         haversineDistanceMeters(lastPosition, currentPosition) >= MIN_HEADING_UPDATE_DISTANCE_METERS
       ) {
-        mapRef.current.setHeading(bearingBetween(lastPosition, currentPosition));
+        lastHeadingRef.current = bearingBetween(lastPosition, currentPosition);
+        mapRef.current.setHeading(lastHeadingRef.current);
       }
       lastHeadingPositionRef.current = currentPosition;
+
+      const icon: google.maps.Symbol = {
+        path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+        rotation: lastHeadingRef.current,
+        scale: 6,
+        fillColor: "#4c9a6a",
+        fillOpacity: 1,
+        strokeColor: "#0b0c0e",
+        strokeWeight: 2,
+      };
+      if (!currentMarkerRef.current) {
+        currentMarkerRef.current = new google.maps.Marker({
+          map: mapRef.current,
+          position: currentPosition,
+          title: "現在地",
+          icon,
+        });
+      } else {
+        currentMarkerRef.current.setPosition(currentPosition);
+        currentMarkerRef.current.setIcon(icon);
+      }
+      return;
     }
 
     if (!currentMarkerRef.current) {
@@ -129,6 +162,34 @@ export function MapView({ currentPosition, destination, waypoint }: MapViewProps
       waypointMarkerRef.current.setPosition(waypoint);
     }
   }, [waypoint, mapReady]);
+
+  useEffect(() => {
+    if (!mapRef.current) return;
+    if (!routePolyline) {
+      polylineRef.current?.setMap(null);
+      polylineRef.current = null;
+      return;
+    }
+    let cancelled = false;
+    void importLibrary("geometry").then(({ encoding }) => {
+      if (cancelled || !mapRef.current) return;
+      const path = encoding.decodePath(routePolyline);
+      if (!polylineRef.current) {
+        polylineRef.current = new google.maps.Polyline({
+          map: mapRef.current,
+          path,
+          strokeColor: "#4c7093",
+          strokeOpacity: 0.9,
+          strokeWeight: 5,
+        });
+      } else {
+        polylineRef.current.setPath(path);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [routePolyline, mapReady]);
 
   // ルートプレビュー用: 経由地がある間は現在地・経由地・目的地の3点が収まるよう表示範囲を合わせる
   useEffect(() => {

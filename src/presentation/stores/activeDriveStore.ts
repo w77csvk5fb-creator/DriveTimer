@@ -9,7 +9,11 @@ import type {
   LocationError,
   LocationRepository,
 } from "@/domain/repositories/locationRepository";
-import type { DirectionsRepository, EtaResult } from "@/domain/repositories/directionsRepository";
+import type {
+  DirectionsRepository,
+  EtaResult,
+  RouteDetail,
+} from "@/domain/repositories/directionsRepository";
 import type { DriveHistoryRepository } from "@/domain/repositories/driveHistoryRepository";
 import { BrowserWakeLockController } from "@/data/datasources/browser/wakeLockDataSource";
 import { BrowserNotificationController } from "@/data/datasources/browser/webNotificationDataSource";
@@ -55,7 +59,7 @@ interface ActiveDriveState {
   readonly driveStatus: DriveStatus | null;
   readonly firedNotificationIds: ReadonlySet<NotificationEventId>;
   readonly lastNotification: NotificationEvent | null;
-  readonly lastEta: EtaResult | null;
+  readonly lastEta: RouteDetail | null;
   readonly summary: DriveSummary | null;
   readonly locationError: LocationError | null;
   readonly wakeLockSupported: boolean;

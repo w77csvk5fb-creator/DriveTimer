@@ -25,7 +25,7 @@ export class SimulatedDirectionsRepository implements DirectionsRepository {
     private readonly clock: SimClock,
   ) {}
 
-  async getTrafficAwareEta(origin: GeoPoint, destination: GeoPoint): Promise<EtaResult> {
+  async getTrafficAwareEta(origin: GeoPoint, destination: GeoPoint): Promise<RouteDetail> {
     const distanceMeters = haversineDistanceMeters(origin, destination);
     const atMinutes = this.clock.elapsedSimMinutes();
     const multiplier = interpolateLinear(
@@ -34,7 +34,9 @@ export class SimulatedDirectionsRepository implements DirectionsRepository {
       (k) => k.multiplier,
     );
     const durationMs = (distanceMeters / AVG_SPEED_MPS) * 1000 * multiplier;
-    return { durationMs, distanceMeters };
+    // シミュレーションには実際の道路・案内文データが無いため、ターンバイターン表示は空で返す
+    // (HomeScreen側はsteps/overviewPolylineが空なら案内バナー・ルート線を出さずに済ませる)。
+    return { durationMs, distanceMeters, steps: [], overviewPolyline: "" };
   }
 
   async getFastestRoute(origin: GeoPoint, destination: GeoPoint): Promise<EtaResult> {
@@ -58,6 +60,6 @@ export class SimulatedDirectionsRepository implements DirectionsRepository {
     const distanceMeters =
       haversineDistanceMeters(origin, waypoint) + haversineDistanceMeters(waypoint, destination);
     const durationMs = (distanceMeters / AVG_SPEED_MPS) * 1000;
-    return { durationMs, distanceMeters, steps: [] };
+    return { durationMs, distanceMeters, steps: [], overviewPolyline: "" };
   }
 }

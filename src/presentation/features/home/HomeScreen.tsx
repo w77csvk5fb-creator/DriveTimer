@@ -11,12 +11,14 @@ import { WakeLockWarningBanner } from "@/presentation/components/WakeLockWarning
 import { LocationErrorBanner } from "@/presentation/components/LocationErrorBanner";
 import { NotificationToast } from "@/presentation/components/NotificationToast";
 import { FastestRouteButton } from "@/presentation/components/FastestRouteButton";
+import { TurnByTurnBanner } from "@/presentation/components/TurnByTurnBanner";
 
 export function HomeScreen() {
   const phase = useActiveDriveStore((s) => s.phase);
   const driveStatus = useActiveDriveStore((s) => s.driveStatus);
   const currentPosition = useActiveDriveStore((s) => s.currentPosition);
   const destination = useActiveDriveStore((s) => s.destination);
+  const lastEta = useActiveDriveStore((s) => s.lastEta);
   const summary = useActiveDriveStore((s) => s.summary);
   const endDrive = useActiveDriveStore((s) => s.endDrive);
   const dismissSummary = useActiveDriveStore((s) => s.dismissSummary);
@@ -95,8 +97,13 @@ export function HomeScreen() {
       )}
 
       {lastNotification && <NotificationToast event={lastNotification} />}
+      {lastEta && lastEta.steps.length > 0 && <TurnByTurnBanner step={lastEta.steps[0]} />}
 
-      <MapView currentPosition={currentPosition} destination={destination} />
+      <MapView
+        currentPosition={currentPosition}
+        destination={destination}
+        routePolyline={lastEta?.overviewPolyline}
+      />
 
       <button
         type="button"

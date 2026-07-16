@@ -53,6 +53,39 @@ describe("RemoteDirectionsRepository", () => {
     expect(result.durationMs).toBe(400_000);
   });
 
+  it("extracts the overview polyline and step maneuvers for turn-by-turn display", async () => {
+    mockFetchOnce({
+      status: "OK",
+      routes: [
+        {
+          overview_polyline: { points: "abc123" },
+          legs: [
+            {
+              duration: { value: 600 },
+              distance: { value: 5000 },
+              steps: [
+                {
+                  html_instructions: "右折",
+                  duration: { value: 60 },
+                  distance: { value: 200 },
+                  maneuver: "turn-right",
+                  start_location: { lat: 35.6, lng: 139.7 },
+                  end_location: { lat: 35.61, lng: 139.7 },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    const result = await new RemoteDirectionsRepository().getTrafficAwareEta(origin, destination);
+    expect(result.overviewPolyline).toBe("abc123");
+    expect(result.steps[0].maneuver).toBe("turn-right");
+    expect(result.steps[0].startLocation).toEqual({ lat: 35.6, lng: 139.7 });
+    expect(result.steps[0].endLocation).toEqual({ lat: 35.61, lng: 139.7 });
+  });
+
   it("throws when the API returns a non-OK status", async () => {
     mockFetchOnce({ status: "ZERO_RESULTS", routes: [] });
 
@@ -87,6 +120,9 @@ describe("RemoteDirectionsRepository", () => {
                     html_instructions: "海岸沿いを<b>右折</b>",
                     duration: { value: 300 },
                     distance: { value: 2000 },
+                    maneuver: "turn-right",
+                    start_location: { lat: 35.61, lng: 139.7 },
+                    end_location: { lat: 35.62, lng: 139.7 },
                   },
                   {
                     html_instructions: "山道を直進",
@@ -109,8 +145,22 @@ describe("RemoteDirectionsRepository", () => {
       expect(result.durationMs).toBe(700_000);
       expect(result.distanceMeters).toBe(4000);
       expect(result.steps).toEqual([
-        { instructionText: "海岸沿いを右折", durationMs: 300_000, distanceMeters: 2000 },
-        { instructionText: "山道を直進", durationMs: 400_000, distanceMeters: 2000 },
+        {
+          instructionText: "海岸沿いを右折",
+          durationMs: 300_000,
+          distanceMeters: 2000,
+          maneuver: "turn-right",
+          startLocation: { lat: 35.61, lng: 139.7 },
+          endLocation: { lat: 35.62, lng: 139.7 },
+        },
+        {
+          instructionText: "山道を直進",
+          durationMs: 400_000,
+          distanceMeters: 2000,
+          maneuver: null,
+          startLocation: { lat: 0, lng: 0 },
+          endLocation: { lat: 0, lng: 0 },
+        },
       ]);
     });
 

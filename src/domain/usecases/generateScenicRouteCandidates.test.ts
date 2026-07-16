@@ -32,8 +32,8 @@ class FakeDirectionsRepository implements DirectionsRepository {
     private readonly byBearing: ReadonlyMap<number, RouteDetail>,
   ) {}
 
-  async getTrafficAwareEta(): Promise<EtaResult> {
-    return this.directEta;
+  async getTrafficAwareEta(): Promise<RouteDetail> {
+    return { ...this.directEta, steps: [], overviewPolyline: "" };
   }
 
   async getFastestRoute(): Promise<EtaResult> {
@@ -54,7 +54,7 @@ class FakeDirectionsRepository implements DirectionsRepository {
 }
 
 function makeRoute(durationMs: number): RouteDetail {
-  return { durationMs, distanceMeters: durationMs * 10, steps: [] };
+  return { durationMs, distanceMeters: durationMs * 10, steps: [], overviewPolyline: "" };
 }
 
 describe("generateScenicRouteCandidates", () => {

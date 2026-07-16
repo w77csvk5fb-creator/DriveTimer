@@ -15,12 +15,20 @@ function route(overrides: Partial<RouteDetail> & { steps: RouteDetail["steps"] }
   return {
     durationMs: 20 * 60_000,
     distanceMeters: 15_000,
+    overviewPolyline: "",
     ...overrides,
   };
 }
 
 function step(instructionText: string): RouteDetail["steps"][number] {
-  return { instructionText, durationMs: 5 * 60_000, distanceMeters: 3_000 };
+  return {
+    instructionText,
+    durationMs: 5 * 60_000,
+    distanceMeters: 3_000,
+    maneuver: null,
+    startLocation: { lat: 0, lng: 0 },
+    endLocation: { lat: 0, lng: 0 },
+  };
 }
 
 describe("scoreRouteCategory", () => {
