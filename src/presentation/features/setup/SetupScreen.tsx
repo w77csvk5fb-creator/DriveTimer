@@ -72,9 +72,11 @@ export function SetupScreen() {
     }
     const deadline = parseDeadline(deadlineValue);
 
-    // 景観ルート提案(selectedCandidateId)はあくまで一度きりの提案であり、
+    // 景観ルート提案(selectedCandidateId)の経由地は地図の表示にのみ使い、
     // 走行中のライブ安全計算(activeDriveStore)には一切組み込まない。
-    startRealDrive(destination.point, deadline, safetyBufferMinutes);
+    const selectedWaypoint =
+      scenicResult?.candidates.find((c) => c.id === selectedCandidateId)?.waypoint ?? null;
+    startRealDrive(destination.point, deadline, safetyBufferMinutes, selectedWaypoint);
     router.push("/");
   };
 

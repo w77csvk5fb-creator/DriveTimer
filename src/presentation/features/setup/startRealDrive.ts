@@ -10,11 +10,13 @@ export function startRealDrive(
   destination: GeoPoint,
   deadline: Date,
   safetyBufferMinutes: number,
+  scenicWaypoint: GeoPoint | null = null,
 ) {
   useActiveDriveStore.getState().startDrive({
     destination,
     deadline,
     safetyBufferMinutes,
+    scenicWaypoint,
     notificationLeadTimesMinutes: useSettingsStore.getState().notificationLeadTimesMinutes,
     locationRepository: new GeolocationDataSource(),
     directionsRepository: new RemoteDirectionsRepository(),

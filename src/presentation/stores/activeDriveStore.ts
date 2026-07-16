@@ -42,6 +42,11 @@ export interface StartDriveParams {
   readonly safetyBufferMinutes: number;
   /** ユーザーが設定画面で選んだ有効な折り返し通知タイミング（分）。省略時は既定値。 */
   readonly notificationLeadTimesMinutes?: readonly number[];
+  /**
+   * 出発前に選んだ景観ルート候補の経由地。表示（地図のルート線）にのみ使い、
+   * 折り返し安全計算(現在地→目的地の直行ETA)には一切影響させない。
+   */
+  readonly scenicWaypoint?: GeoPoint | null;
   readonly locationRepository: LocationRepository;
   readonly directionsRepository: DirectionsRepository;
   readonly historyRepository: DriveHistoryRepository;
@@ -60,6 +65,9 @@ interface ActiveDriveState {
   readonly firedNotificationIds: ReadonlySet<NotificationEventId>;
   readonly lastNotification: NotificationEvent | null;
   readonly lastEta: RouteDetail | null;
+  readonly scenicWaypoint: GeoPoint | null;
+  /** scenicWaypoint経由の表示専用ルート線。安全計算には使わない。取得失敗時はnull。 */
+  readonly displayRoutePolyline: string | null;
   readonly summary: DriveSummary | null;
   readonly locationError: LocationError | null;
   readonly wakeLockSupported: boolean;
@@ -178,6 +186,8 @@ export const useActiveDriveStore = create<ActiveDriveState>((set, get) => ({
   firedNotificationIds: new Set(),
   lastNotification: null,
   lastEta: null,
+  scenicWaypoint: null,
+  displayRoutePolyline: null,
   summary: null,
   locationError: null,
   wakeLockSupported: false,
@@ -203,6 +213,8 @@ export const useActiveDriveStore = create<ActiveDriveState>((set, get) => ({
       firedNotificationIds: new Set(),
       lastNotification: null,
       lastEta: null,
+      scenicWaypoint: params.scenicWaypoint ?? null,
+      displayRoutePolyline: null,
       summary: null,
       locationError: null,
       wakeLockSupported: wakeLockController.isSupported,
@@ -273,6 +285,21 @@ export const useActiveDriveStore = create<ActiveDriveState>((set, get) => ({
         firedNotificationIds: firedIds,
         lastNotification: newlyFired[0] ?? get().lastNotification,
       });
+
+      // 表示専用: 選んだ景観ルートの経由地がある間は、その経路のポリラインも取得する。
+      // 失敗しても安全計算には無関係のため無視する(直前の表示を保持)。
+      if (state.scenicWaypoint && runtime.directionsRepository) {
+        try {
+          const displayRoute = await runtime.directionsRepository.getRouteViaWaypoint(
+            position,
+            state.scenicWaypoint,
+            state.destination,
+          );
+          set({ displayRoutePolyline: displayRoute.overviewPolyline });
+        } catch {
+          // ignore
+        }
+      }
     };
 
     const completeDrive = async (endedAt: Date, finalPosition: GeoPoint | null) => {
@@ -417,6 +444,8 @@ export const useActiveDriveStore = create<ActiveDriveState>((set, get) => ({
       firedNotificationIds: new Set(),
       lastNotification: null,
       lastEta: null,
+      scenicWaypoint: null,
+      displayRoutePolyline: null,
       summary: null,
       locationError: null,
       wakeLockSupported: false,

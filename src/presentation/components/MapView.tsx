@@ -58,6 +58,10 @@ export function MapView({
   // それらのprop自体は二度と変化せず対応するeffectが再実行されないままになるため、
   // 生成完了を状態として持ち、他の全effectの依存配列に加えて再評価を強制する。
   const [mapReady, setMapReady] = useState(false);
+  // ユーザーがピンチ/ドラッグで地図を操作した間は自動追従を止める。
+  // 自分自身のpanTo/setZoom呼び出しをユーザー操作と誤検知しないためのフラグ。
+  const isProgrammaticUpdateRef = useRef(false);
+  const [following, setFollowing] = useState(true);
 
   useEffect(() => {
     if (!isGoogleMapsConfigured || !containerRef.current) return;
@@ -72,6 +76,12 @@ export function MapView({
         disableDefaultUI: true,
         styles: DARK_MAP_STYLE,
       });
+      mapRef.current.addListener("dragstart", () => {
+        if (!isProgrammaticUpdateRef.current) setFollowing(false);
+      });
+      mapRef.current.addListener("zoom_changed", () => {
+        if (!isProgrammaticUpdateRef.current) setFollowing(false);
+      });
       setMapReady(true);
     });
 
@@ -84,22 +94,31 @@ export function MapView({
 
   useEffect(() => {
     if (!mapRef.current || !currentPosition) return;
-    mapRef.current.panTo(currentPosition);
 
     // 実ナビ同様、走行中(プレビューではない)は現在地に寄って進行方向へ回転させ、
     // 現在地マーカーも進行方向を指す矢印にする
     if (!waypoint) {
-      mapRef.current.setZoom(FOLLOW_ZOOM);
-      mapRef.current.setTilt(FOLLOW_TILT);
+      // 進行方向は追従が止まっていても(矢印マーカーのため)常に更新する
       const lastPosition = lastHeadingPositionRef.current;
       if (
         lastPosition &&
         haversineDistanceMeters(lastPosition, currentPosition) >= MIN_HEADING_UPDATE_DISTANCE_METERS
       ) {
         lastHeadingRef.current = bearingBetween(lastPosition, currentPosition);
-        mapRef.current.setHeading(lastHeadingRef.current);
       }
       lastHeadingPositionRef.current = currentPosition;
+
+      // カメラの追従(パン・ズーム・傾き・回転)はユーザーが手動操作していない間だけ行う
+      if (following) {
+        isProgrammaticUpdateRef.current = true;
+        mapRef.current.panTo(currentPosition);
+        mapRef.current.setZoom(FOLLOW_ZOOM);
+        mapRef.current.setTilt(FOLLOW_TILT);
+        mapRef.current.setHeading(lastHeadingRef.current);
+        setTimeout(() => {
+          isProgrammaticUpdateRef.current = false;
+        }, 0);
+      }
 
       const icon: google.maps.Symbol = {
         path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
@@ -124,6 +143,7 @@ export function MapView({
       return;
     }
 
+    mapRef.current.panTo(currentPosition);
     if (!currentMarkerRef.current) {
       currentMarkerRef.current = new google.maps.Marker({
         map: mapRef.current,
@@ -133,7 +153,7 @@ export function MapView({
     } else {
       currentMarkerRef.current.setPosition(currentPosition);
     }
-  }, [currentPosition, mapReady, waypoint]);
+  }, [currentPosition, mapReady, waypoint, following]);
 
   useEffect(() => {
     if (!mapRef.current || !destination || destinationMarkerRef.current) return;
@@ -220,5 +240,18 @@ export function MapView({
     );
   }
 
-  return <div ref={containerRef} className="flex-1 rounded-2xl border border-outline" />;
+  return (
+    <div className="relative flex flex-1">
+      <div ref={containerRef} className="flex-1 rounded-2xl border border-outline" />
+      {!waypoint && !following && (
+        <button
+          type="button"
+          onClick={() => setFollowing(true)}
+          className="absolute bottom-3 right-3 rounded-full border border-outline bg-surface-raised-1 px-3 py-2 text-sm font-semibold text-on-surface shadow-lg"
+        >
+          📍 現在地に戻る
+        </button>
+      )}
+    </div>
+  );
 }

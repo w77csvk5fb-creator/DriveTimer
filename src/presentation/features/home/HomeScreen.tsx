@@ -19,6 +19,8 @@ export function HomeScreen() {
   const currentPosition = useActiveDriveStore((s) => s.currentPosition);
   const destination = useActiveDriveStore((s) => s.destination);
   const lastEta = useActiveDriveStore((s) => s.lastEta);
+  const scenicWaypoint = useActiveDriveStore((s) => s.scenicWaypoint);
+  const displayRoutePolyline = useActiveDriveStore((s) => s.displayRoutePolyline);
   const summary = useActiveDriveStore((s) => s.summary);
   const endDrive = useActiveDriveStore((s) => s.endDrive);
   const dismissSummary = useActiveDriveStore((s) => s.dismissSummary);
@@ -102,7 +104,9 @@ export function HomeScreen() {
       <MapView
         currentPosition={currentPosition}
         destination={destination}
-        routePolyline={lastEta?.overviewPolyline}
+        routePolyline={
+          scenicWaypoint ? (displayRoutePolyline ?? undefined) : lastEta?.overviewPolyline
+        }
       />
 
       <button
