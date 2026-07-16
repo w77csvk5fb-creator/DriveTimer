@@ -57,7 +57,7 @@ export function HomeScreen() {
         </div>
         <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
           <div>
-            <h1 className="text-2xl font-bold text-on-surface">DriveTime</h1>
+            <h1 className="text-2xl font-bold text-on-surface">DriveTimer</h1>
             <p className="mt-1 text-on-surface-muted">
               空き時間を安心してドライブに使えるアプリ
             </p>

@@ -12,13 +12,13 @@ const notoSansJP = Noto_Sans_JP({
 });
 
 export const metadata: Metadata = {
-  title: "DriveTime",
+  title: "DriveTimer",
   description: "空き時間を安心してドライブに使えるアプリ",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "DriveTime",
+    title: "DriveTimer",
   },
   icons: {
     icon: [

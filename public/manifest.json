@@ -1,6 +1,6 @@
 {
-  "name": "DriveTime",
-  "short_name": "DriveTime",
+  "name": "DriveTimer",
+  "short_name": "DriveTimer",
   "description": "空き時間を安心してドライブに使えるアプリ",
   "start_url": "/",
   "scope": "/",
