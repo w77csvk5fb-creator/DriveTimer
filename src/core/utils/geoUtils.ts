@@ -22,6 +22,18 @@ export function haversineDistanceMeters(a: GeoPoint, b: GeoPoint): number {
   return 2 * EARTH_RADIUS_METERS * Math.asin(Math.min(1, Math.sqrt(h)));
 }
 
+/** fromからtoを見た初期方位(度、北=0、時計回り)を求める。ナビ画面での進行方向表示に使う。 */
+export function bearingBetween(from: GeoPoint, to: GeoPoint): number {
+  const lat1 = toRad(from.lat);
+  const lat2 = toRad(to.lat);
+  const dLng = toRad(to.lng - from.lng);
+
+  const y = Math.sin(dLng) * Math.cos(lat2);
+  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
+  const bearingDeg = toDeg(Math.atan2(y, x));
+  return (bearingDeg + 360) % 360;
+}
+
 /** originから指定した方位(度、北=0、時計回り)・距離(m)だけ離れた地点を球面近似で求める */
 export function destinationPoint(
   origin: GeoPoint,

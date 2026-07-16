@@ -4,6 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import { importLibrary, setOptions } from "@googlemaps/js-api-loader";
 import type { GeoPoint } from "@/domain/entities/geoPoint";
 import { clientEnv, isGoogleMapsConfigured } from "@/core/config/env";
+import { bearingBetween, haversineDistanceMeters } from "@/core/utils/geoUtils";
+
+// GPSノイズで進行方向が細かく振動しないよう、これ未満の移動では方位を更新しない
+const MIN_HEADING_UPDATE_DISTANCE_METERS = 5;
+const FOLLOW_ZOOM = 17;
+const FOLLOW_TILT = 45;
 
 interface MapViewProps {
   readonly currentPosition: GeoPoint | null;
@@ -38,6 +44,7 @@ export function MapView({ currentPosition, destination, waypoint }: MapViewProps
   const currentMarkerRef = useRef<google.maps.Marker | null>(null);
   const destinationMarkerRef = useRef<google.maps.Marker | null>(null);
   const waypointMarkerRef = useRef<google.maps.Marker | null>(null);
+  const lastHeadingPositionRef = useRef<GeoPoint | null>(null);
   // 地図オブジェクトの生成は非同期。生成完了前にdestination等が確定済みだと、
   // それらのprop自体は二度と変化せず対応するeffectが再実行されないままになるため、
   // 生成完了を状態として持ち、他の全effectの依存配列に加えて再評価を強制する。
@@ -69,6 +76,21 @@ export function MapView({ currentPosition, destination, waypoint }: MapViewProps
   useEffect(() => {
     if (!mapRef.current || !currentPosition) return;
     mapRef.current.panTo(currentPosition);
+
+    // 実ナビ同様、走行中(プレビューではない)は現在地に寄って進行方向へ回転させる
+    if (!waypoint) {
+      mapRef.current.setZoom(FOLLOW_ZOOM);
+      mapRef.current.setTilt(FOLLOW_TILT);
+      const lastPosition = lastHeadingPositionRef.current;
+      if (
+        lastPosition &&
+        haversineDistanceMeters(lastPosition, currentPosition) >= MIN_HEADING_UPDATE_DISTANCE_METERS
+      ) {
+        mapRef.current.setHeading(bearingBetween(lastPosition, currentPosition));
+      }
+      lastHeadingPositionRef.current = currentPosition;
+    }
+
     if (!currentMarkerRef.current) {
       currentMarkerRef.current = new google.maps.Marker({
         map: mapRef.current,
@@ -78,7 +100,7 @@ export function MapView({ currentPosition, destination, waypoint }: MapViewProps
     } else {
       currentMarkerRef.current.setPosition(currentPosition);
     }
-  }, [currentPosition, mapReady]);
+  }, [currentPosition, mapReady, waypoint]);
 
   useEffect(() => {
     if (!mapRef.current || !destination || destinationMarkerRef.current) return;
