@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { importLibrary, setOptions } from "@googlemaps/js-api-loader";
 import type { GeoPoint } from "@/domain/entities/geoPoint";
 import { clientEnv, isGoogleMapsConfigured } from "@/core/config/env";
@@ -38,6 +38,10 @@ export function MapView({ currentPosition, destination, waypoint }: MapViewProps
   const currentMarkerRef = useRef<google.maps.Marker | null>(null);
   const destinationMarkerRef = useRef<google.maps.Marker | null>(null);
   const waypointMarkerRef = useRef<google.maps.Marker | null>(null);
+  // 地図オブジェクトの生成は非同期。生成完了前にdestination等が確定済みだと、
+  // それらのprop自体は二度と変化せず対応するeffectが再実行されないままになるため、
+  // 生成完了を状態として持ち、他の全effectの依存配列に加えて再評価を強制する。
+  const [mapReady, setMapReady] = useState(false);
 
   useEffect(() => {
     if (!isGoogleMapsConfigured || !containerRef.current) return;
@@ -52,6 +56,7 @@ export function MapView({ currentPosition, destination, waypoint }: MapViewProps
         disableDefaultUI: true,
         styles: DARK_MAP_STYLE,
       });
+      setMapReady(true);
     });
 
     return () => {
@@ -73,7 +78,7 @@ export function MapView({ currentPosition, destination, waypoint }: MapViewProps
     } else {
       currentMarkerRef.current.setPosition(currentPosition);
     }
-  }, [currentPosition]);
+  }, [currentPosition, mapReady]);
 
   useEffect(() => {
     if (!mapRef.current || !destination || destinationMarkerRef.current) return;
@@ -82,7 +87,7 @@ export function MapView({ currentPosition, destination, waypoint }: MapViewProps
       position: destination,
       title: "目的地",
     });
-  }, [destination]);
+  }, [destination, mapReady]);
 
   useEffect(() => {
     if (!mapRef.current) return;
@@ -101,7 +106,7 @@ export function MapView({ currentPosition, destination, waypoint }: MapViewProps
     } else {
       waypointMarkerRef.current.setPosition(waypoint);
     }
-  }, [waypoint]);
+  }, [waypoint, mapReady]);
 
   // ルートプレビュー用: 経由地がある間は現在地・経由地・目的地の3点が収まるよう表示範囲を合わせる
   useEffect(() => {
@@ -111,7 +116,7 @@ export function MapView({ currentPosition, destination, waypoint }: MapViewProps
     if (currentPosition) bounds.extend(currentPosition);
     if (destination) bounds.extend(destination);
     mapRef.current.fitBounds(bounds, 32);
-  }, [waypoint, currentPosition, destination]);
+  }, [waypoint, currentPosition, destination, mapReady]);
 
   if (!isGoogleMapsConfigured) {
     return (
