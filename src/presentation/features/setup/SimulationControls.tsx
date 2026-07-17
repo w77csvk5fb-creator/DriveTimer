@@ -25,7 +25,7 @@ export function SimulationControls({
             title={scenario.descriptionJa}
             className={`rounded-full border px-3 py-1.5 text-sm ${
               scenarioId === scenario.id
-                ? "border-accent-primary bg-accent-primary/20 text-on-surface"
+                ? "pill-selected border-accent-primary text-on-surface"
                 : "border-outline text-on-surface-muted"
             }`}
           >
@@ -42,7 +42,7 @@ export function SimulationControls({
             onClick={() => onSpeedChange(mult)}
             className={`rounded-full border px-2.5 py-1 ${
               speed === mult
-                ? "border-accent-primary bg-accent-primary/20 text-on-surface"
+                ? "pill-selected border-accent-primary text-on-surface"
                 : "border-outline"
             }`}
           >

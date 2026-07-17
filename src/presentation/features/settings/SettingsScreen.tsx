@@ -42,7 +42,7 @@ export function SettingsScreen() {
             <button
               type="button"
               onClick={handleClearAll}
-              className="text-sm text-accent-urgent"
+              className="btn-danger-gradient rounded-full px-3 py-1.5 text-xs font-bold text-on-surface"
             >
               履歴をすべて削除
             </button>
@@ -77,7 +77,7 @@ export function SettingsScreen() {
               <button
                 type="button"
                 onClick={() => void handleDelete(entry.id)}
-                className="shrink-0 text-sm text-on-surface-muted"
+                className="btn-danger-gradient shrink-0 rounded-full px-3 py-1 text-xs font-bold text-on-surface"
               >
                 削除
               </button>

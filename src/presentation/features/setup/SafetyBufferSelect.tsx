@@ -17,7 +17,7 @@ export function SafetyBufferSelect({ value, onChange }: SafetyBufferSelectProps)
             onClick={() => onChange(minutes)}
             className={`rounded-full border px-3 py-1.5 text-sm ${
               value === minutes
-                ? "border-accent-primary bg-accent-primary/20 text-on-surface"
+                ? "pill-selected border-accent-primary text-on-surface"
                 : "border-outline text-on-surface-muted"
             }`}
           >

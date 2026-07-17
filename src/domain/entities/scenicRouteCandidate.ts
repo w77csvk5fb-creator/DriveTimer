@@ -17,4 +17,6 @@ export interface ScenicRouteCandidate {
   /** 0〜1、目標周回時間との適合度 */
   readonly durationFitScore: number;
   readonly combinedScore: number;
+  /** 地図プレビュー描画用のエンコード済みポリライン。取得できない場合は空文字。 */
+  readonly overviewPolyline: string;
 }

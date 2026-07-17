@@ -39,7 +39,7 @@ export function HomeScreen() {
         <button
           type="button"
           onClick={dismissSummary}
-          className="rounded-xl bg-accent-primary px-4 py-2.5 font-semibold text-on-surface"
+          className="btn-primary-gradient h-14 rounded-2xl text-base font-bold text-on-surface"
         >
           閉じる
         </button>
@@ -64,7 +64,7 @@ export function HomeScreen() {
           </div>
           <Link
             href="/setup"
-            className="rounded-xl bg-accent-primary px-6 py-3 font-semibold text-on-surface"
+            className="btn-primary-gradient rounded-2xl px-8 py-4 text-base font-bold text-on-surface"
           >
             ドライブを計画する
           </Link>
@@ -112,7 +112,7 @@ export function HomeScreen() {
       <button
         type="button"
         onClick={endDrive}
-        className="h-[68px] rounded-[20px] bg-gradient-to-b from-accent-urgent to-[#a01920] text-lg font-bold text-on-surface shadow-lg shadow-accent-urgent/30"
+        className="btn-danger-gradient h-[68px] rounded-[20px] text-lg font-bold text-on-surface"
       >
         ドライブ終了
       </button>

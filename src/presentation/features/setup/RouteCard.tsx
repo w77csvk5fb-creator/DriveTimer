@@ -18,7 +18,7 @@ export function RouteCard({ candidate, directDurationMs, selected, onSelect }: R
       type="button"
       onClick={onSelect}
       className={`flex flex-col gap-1 rounded-xl border p-3 text-left ${
-        selected ? "border-accent-primary bg-accent-primary/10" : "border-outline"
+        selected ? "pill-selected border-accent-primary" : "border-outline"
       }`}
     >
       <span className="text-sm font-semibold text-on-surface">

@@ -60,7 +60,7 @@ export function FavoritesSettings() {
             <button
               type="button"
               onClick={() => void handleDelete(favorite.id)}
-              className="shrink-0 text-sm text-on-surface-muted"
+              className="btn-danger-gradient shrink-0 rounded-full px-3 py-1 text-xs font-bold text-on-surface"
             >
               削除
             </button>

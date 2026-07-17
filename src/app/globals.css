@@ -52,13 +52,52 @@ body {
   filter: drop-shadow(0 0 6px color-mix(in srgb, var(--accent-cyan) 70%, transparent));
 }
 
-/* ボタンタップ時の押下フィードバック。transform/opacityのみでGPU描画、レイアウト再計算なし。 */
-button:not(:disabled) {
+/*
+ * 画面全体で共通のボタン意匠(グラデーション+ドロップシャドウ)。
+ * サイズ・角丸・余白は呼び出し側のTailwindクラスに任せ、色と質感だけをここで統一する。
+ */
+.btn-primary-gradient {
+  background: linear-gradient(
+    to bottom,
+    var(--accent-primary),
+    color-mix(in srgb, var(--accent-primary) 65%, black)
+  );
+  box-shadow: 0 8px 20px -8px color-mix(in srgb, var(--accent-primary) 60%, transparent);
+}
+.btn-danger-gradient {
+  background: linear-gradient(
+    to bottom,
+    var(--accent-urgent),
+    color-mix(in srgb, var(--accent-urgent) 65%, black)
+  );
+  box-shadow: 0 8px 20px -8px color-mix(in srgb, var(--accent-urgent) 60%, transparent);
+}
+
+/* 選択中のピル/カード(安全バッファ・シミュレーション設定・おすすめルート等)に使う軽めのグラデーション。 */
+.pill-selected {
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--accent-primary) 55%, transparent),
+    color-mix(in srgb, var(--accent-primary) 25%, transparent)
+  );
+  box-shadow: 0 4px 10px -4px color-mix(in srgb, var(--accent-primary) 45%, transparent);
+}
+
+/*
+ * ボタンタップ時の押下フィードバック。transform/opacityのみでGPU描画、レイアウト再計算なし。
+ * .btn-primary-gradient/.btn-danger-gradientは<Link>で描画されるCTAもあるため、
+ * button要素だけでなくこれらのクラスを持つ要素にも適用する。
+ */
+button:not(:disabled),
+.btn-primary-gradient,
+.btn-danger-gradient {
   transition:
     transform 0.1s ease-out,
     opacity 0.1s ease-out;
 }
-button:not(:disabled):active {
+button:not(:disabled):active,
+.btn-primary-gradient:active,
+.btn-danger-gradient:active {
   transform: scale(0.96);
   opacity: 0.85;
 }
@@ -78,7 +117,11 @@ button:not(:disabled):active {
 
 @media (prefers-reduced-motion: reduce) {
   button:not(:disabled),
-  button:not(:disabled):active {
+  button:not(:disabled):active,
+  .btn-primary-gradient,
+  .btn-primary-gradient:active,
+  .btn-danger-gradient,
+  .btn-danger-gradient:active {
     transition: none;
     transform: none;
   }

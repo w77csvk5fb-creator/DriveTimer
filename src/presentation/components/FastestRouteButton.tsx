@@ -23,7 +23,7 @@ export function FastestRouteButton() {
         type="button"
         onClick={() => void fetchFastestRoute()}
         disabled={fastestRouteLoading}
-        className="w-full rounded-xl bg-accent-urgent px-4 py-3 text-lg font-bold text-on-surface disabled:opacity-60"
+        className="btn-danger-gradient w-full rounded-2xl px-4 py-3 text-lg font-bold text-on-surface disabled:opacity-60"
       >
         {fastestRouteLoading ? "検索中…" : "最短ルートへ変更"}
       </button>

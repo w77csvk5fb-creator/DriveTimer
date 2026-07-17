@@ -187,6 +187,7 @@ describe("dedupeScenicRouteCandidates", () => {
       windingRatio: 0,
       durationFitScore: combinedScore,
       combinedScore,
+      overviewPolyline: "",
     };
   }
 

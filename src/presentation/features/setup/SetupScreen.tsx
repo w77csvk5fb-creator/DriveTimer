@@ -60,17 +60,17 @@ export function SetupScreen() {
   const handleStart = () => {
     setError(null);
 
-    if (simulationMode) {
-      startSimulatedDrive(scenarioId, speed, safetyBufferMinutes);
-      router.push("/");
-      return;
-    }
-
     if (!destination) {
       setError("目的地を選択してください。");
       return;
     }
     const deadline = parseDeadline(deadlineValue);
+
+    if (simulationMode) {
+      startSimulatedDrive(scenarioId, speed, safetyBufferMinutes, destination.point, deadline);
+      router.push("/");
+      return;
+    }
 
     // 景観ルート提案(selectedCandidateId)の経由地は地図の表示にのみ使い、
     // 走行中のライブ安全計算(activeDriveStore)には一切組み込まない。
@@ -122,7 +122,7 @@ export function SetupScreen() {
           onClick={() => setSimulationMode((v) => !v)}
           className={`rounded-full px-4 py-1.5 text-sm font-semibold ${
             simulationMode
-              ? "bg-accent-primary text-on-surface"
+              ? "pill-selected border border-accent-primary text-on-surface"
               : "border border-outline text-on-surface-muted"
           }`}
         >
@@ -130,7 +130,7 @@ export function SetupScreen() {
         </button>
       </div>
 
-      {simulationMode ? (
+      {simulationMode && (
         <section className="rounded-2xl border border-outline bg-surface-raised-1 p-4">
           <SimulationControls
             scenarioId={scenarioId}
@@ -139,89 +139,86 @@ export function SetupScreen() {
             onSpeedChange={setSpeed}
           />
         </section>
-      ) : (
-        <>
-          <section className="flex flex-col gap-4 rounded-2xl border border-outline bg-surface-raised-1 p-4">
-            <FavoriteDestinationPicker onSelect={setDestination} refreshKey={favoritesRefreshKey} />
-            <DestinationSearchField
-              onSelect={setDestination}
-              selectedDestinationName={destination?.name}
-            />
-            <SaveFavoriteButton
-              destination={destination}
-              onSaved={() => setFavoritesRefreshKey((k) => k + 1)}
-            />
-            <DeadlineInput value={deadlineValue} onChange={setDeadlineValue} />
-          </section>
+      )}
 
-          {destination && (
-            <section className="flex flex-col gap-3 rounded-2xl border border-outline bg-surface-raised-1 p-4">
-              <button
-                type="button"
-                onClick={() => void handleGenerateScenicRoutes()}
-                disabled={scenicLoading}
-                className="rounded-xl border border-outline px-4 py-2.5 text-sm font-semibold text-on-surface disabled:opacity-50"
-              >
-                {scenicLoading ? "検索中…" : "🌄 景色の良いルートを提案"}
-              </button>
+      <section className="flex flex-col gap-4 rounded-2xl border border-outline bg-surface-raised-1 p-4">
+        <FavoriteDestinationPicker onSelect={setDestination} refreshKey={favoritesRefreshKey} />
+        <DestinationSearchField
+          onSelect={setDestination}
+          selectedDestinationName={destination?.name}
+        />
+        <SaveFavoriteButton
+          destination={destination}
+          onSaved={() => setFavoritesRefreshKey((k) => k + 1)}
+        />
+        <DeadlineInput value={deadlineValue} onChange={setDeadlineValue} />
+      </section>
 
-              {scenicError && <p className="text-sm text-accent-urgent">{scenicError}</p>}
+      {!simulationMode && destination && (
+        <section className="flex flex-col gap-3 rounded-2xl border border-outline bg-surface-raised-1 p-4">
+          <button
+            type="button"
+            onClick={() => void handleGenerateScenicRoutes()}
+            disabled={scenicLoading}
+            className="btn-primary-gradient rounded-xl px-4 py-2.5 text-sm font-bold text-on-surface disabled:opacity-50"
+          >
+            {scenicLoading ? "検索中…" : "🌄 景色の良いルートを提案"}
+          </button>
 
-              {scenicResult?.skippedReason === "insufficientFreeTime" && (
-                <p className="text-sm text-on-surface-muted">
-                  自由時間が少ないため、景観ルートの提案はスキップされました。
-                </p>
-              )}
+          {scenicError && <p className="text-sm text-accent-urgent">{scenicError}</p>}
 
-              {scenicResult && scenicResult.candidates.length === 0 && !scenicResult.skippedReason && (
-                <p className="text-sm text-on-surface-muted">
-                  条件に合う景観ルートが見つかりませんでした。
-                </p>
-              )}
-
-              {scenicResult && scenicResult.candidates.length > 0 && (
-                <div className="flex flex-col gap-2">
-                  {scenicResult.candidates.map((candidate) => (
-                    <RouteCard
-                      key={candidate.id}
-                      candidate={candidate}
-                      directDurationMs={scenicResult.directDurationMs}
-                      selected={selectedCandidateId === candidate.id}
-                      onSelect={() => setSelectedCandidateId(candidate.id)}
-                    />
-                  ))}
-
-                  {selectedCandidateId && (
-                    <>
-                      <div className="flex h-56">
-                        <MapView
-                          currentPosition={scenicOrigin}
-                          destination={destination.point}
-                          waypoint={
-                            scenicResult.candidates.find((c) => c.id === selectedCandidateId)
-                              ?.waypoint ?? null
-                          }
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedCandidateId(null)}
-                        className="self-start text-xs text-on-surface-muted underline"
-                      >
-                        選択を解除して経由せず出発する
-                      </button>
-                    </>
-                  )}
-
-                  <p className="text-xs text-on-surface-muted">
-                    ※
-                    表示は参考のルートプレビューです（出発時のルートには反映されません。安全計算は常に現在地基準で行われます）。選択後、下の「出発」ボタンを押すとドライブを開始します。
-                  </p>
-                </div>
-              )}
-            </section>
+          {scenicResult?.skippedReason === "insufficientFreeTime" && (
+            <p className="text-sm text-on-surface-muted">
+              自由時間が少ないため、景観ルートの提案はスキップされました。
+            </p>
           )}
-        </>
+
+          {scenicResult && scenicResult.candidates.length === 0 && !scenicResult.skippedReason && (
+            <p className="text-sm text-on-surface-muted">
+              条件に合う景観ルートが見つかりませんでした。
+            </p>
+          )}
+
+          {scenicResult && scenicResult.candidates.length > 0 && (
+            <div className="flex flex-col gap-2">
+              {scenicResult.candidates.map((candidate) => (
+                <RouteCard
+                  key={candidate.id}
+                  candidate={candidate}
+                  directDurationMs={scenicResult.directDurationMs}
+                  selected={selectedCandidateId === candidate.id}
+                  onSelect={() =>
+                    setSelectedCandidateId((prev) =>
+                      prev === candidate.id ? null : candidate.id,
+                    )
+                  }
+                />
+              ))}
+
+              {selectedCandidateId &&
+                (() => {
+                  const selectedCandidate = scenicResult.candidates.find(
+                    (c) => c.id === selectedCandidateId,
+                  );
+                  return (
+                    <div className="flex h-56">
+                      <MapView
+                        currentPosition={scenicOrigin}
+                        destination={destination.point}
+                        waypoint={selectedCandidate?.waypoint ?? null}
+                        routePolyline={selectedCandidate?.overviewPolyline}
+                      />
+                    </div>
+                  );
+                })()}
+
+              <p className="text-xs text-on-surface-muted">
+                ※
+                表示は参考のルートプレビューです（出発時のルートには反映されません。安全計算は常に現在地基準で行われます）。選択後、下の「出発」ボタンを押すとドライブを開始します。選択中のルートをもう一度タップすると解除できます。
+              </p>
+            </div>
+          )}
+        </section>
       )}
 
       <section className="rounded-2xl border border-outline bg-surface-raised-1 p-4">
@@ -233,7 +230,7 @@ export function SetupScreen() {
       <button
         type="button"
         onClick={handleStart}
-        className="rounded-xl bg-accent-primary px-4 py-2.5 font-semibold text-on-surface"
+        className="btn-primary-gradient h-14 rounded-2xl text-base font-bold text-on-surface"
       >
         出発
       </button>

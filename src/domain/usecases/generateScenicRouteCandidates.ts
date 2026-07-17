@@ -141,6 +141,7 @@ export async function generateScenicRouteCandidates(
       windingRatio,
       durationFitScore: s.durationFitScore,
       combinedScore,
+      overviewPolyline: s.normalRoute.overviewPolyline,
     };
   });
 
