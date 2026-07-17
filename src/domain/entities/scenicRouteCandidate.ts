@@ -19,4 +19,6 @@ export interface ScenicRouteCandidate {
   readonly combinedScore: number;
   /** 地図プレビュー描画用のエンコード済みポリライン。取得できない場合は空文字。 */
   readonly overviewPolyline: string;
+  /** highwayRatioが閾値を超え、高速道路を有意に利用するルートかどうか */
+  readonly usesHighway: boolean;
 }

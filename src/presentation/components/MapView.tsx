@@ -5,6 +5,7 @@ import { importLibrary, setOptions } from "@googlemaps/js-api-loader";
 import type { GeoPoint } from "@/domain/entities/geoPoint";
 import { clientEnv, isGoogleMapsConfigured } from "@/core/config/env";
 import { bearingBetween, haversineDistanceMeters } from "@/core/utils/geoUtils";
+import { useSettingsStore, type MapThemeMode } from "@/presentation/stores/settingsStore";
 
 // GPSノイズで進行方向が細かく振動しないよう、これ未満の移動では方位を更新しない
 const MIN_HEADING_UPDATE_DISTANCE_METERS = 5;
@@ -18,6 +19,8 @@ interface MapViewProps {
   readonly waypoint?: GeoPoint | null;
   /** エンコード済みポリライン。指定時、現在地から目的地までの経路を線で描画する。 */
   readonly routePolyline?: string | null;
+  /** 到着保証モード等、緊急度の高い状態であることを示す。枠を強調し最低高さを確保する。 */
+  readonly criticalMode?: boolean;
 }
 
 // トヨタ/レクサス的な黒基調ナビ画面に寄せたダークスタイル。
@@ -32,6 +35,27 @@ const DARK_MAP_STYLE: google.maps.MapTypeStyle[] = [
   { featureType: "transit", stylers: [{ visibility: "off" }] },
 ];
 
+// 明るいテーマ。標準の地図色に近いが、POI/交通機関ラベルは他テーマと同様に間引く。
+const LIGHT_MAP_STYLE: google.maps.MapTypeStyle[] = [
+  { featureType: "poi", stylers: [{ visibility: "off" }] },
+  { featureType: "transit", stylers: [{ visibility: "off" }] },
+];
+
+const THEME_OPTIONS: ReadonlyArray<{ value: MapThemeMode; emoji: string; labelJa: string }> = [
+  { value: "dark", emoji: "🌙", labelJa: "ダーク" },
+  { value: "light", emoji: "☀️", labelJa: "ライト" },
+  { value: "satellite", emoji: "🛰️", labelJa: "航空写真" },
+];
+
+function applyTheme(map: google.maps.Map, theme: MapThemeMode) {
+  if (theme === "satellite") {
+    map.setMapTypeId(google.maps.MapTypeId.HYBRID);
+    return;
+  }
+  map.setMapTypeId(google.maps.MapTypeId.ROADMAP);
+  map.setOptions({ styles: theme === "dark" ? DARK_MAP_STYLE : LIGHT_MAP_STYLE });
+}
+
 let optionsInitialized = false;
 function ensureMapsApiOptions(): void {
   if (optionsInitialized) return;
@@ -45,12 +69,18 @@ export function MapView({
   destination,
   waypoint,
   routePolyline,
+  criticalMode = false,
 }: MapViewProps) {
+  const mapTheme = useSettingsStore((s) => s.mapTheme);
+  const setMapTheme = useSettingsStore((s) => s.setMapTheme);
+
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
   const currentMarkerRef = useRef<google.maps.Marker | null>(null);
+  const currentMarkerGlowRef = useRef<google.maps.Marker | null>(null);
   const destinationMarkerRef = useRef<google.maps.Marker | null>(null);
   const waypointMarkerRef = useRef<google.maps.Marker | null>(null);
+  const polylineGlowRef = useRef<google.maps.Polyline | null>(null);
   const polylineRef = useRef<google.maps.Polyline | null>(null);
   const lastHeadingPositionRef = useRef<GeoPoint | null>(null);
   const lastHeadingRef = useRef(0);
@@ -74,8 +104,14 @@ export function MapView({
         center: currentPosition ?? destination ?? { lat: 35.681236, lng: 139.767125 },
         zoom: 13,
         disableDefaultUI: true,
-        styles: DARK_MAP_STYLE,
+        // 回転はユーザーが操作できるよう有効化する。rotateControlは45度航空写真が
+        // 利用可能な地域でしか表示されないため、gestureHandlingで2本指回転ジェスチャー
+        // 自体も常に効くようにしておく(モバイルでの主な操作手段)。
+        rotateControl: true,
+        rotateControlOptions: { position: google.maps.ControlPosition.RIGHT_BOTTOM },
+        gestureHandling: "greedy",
       });
+      applyTheme(mapRef.current, mapTheme);
       mapRef.current.addListener("dragstart", () => {
         if (!isProgrammaticUpdateRef.current) setFollowing(false);
       });
@@ -91,6 +127,12 @@ export function MapView({
     // 初回マウント時にのみ地図を生成する（以後の中心移動/マーカー更新は別のeffectで行う）
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // テーマ切り替え(ユーザー操作による設定変更)を既存の地図インスタンスへ反映する。
+  useEffect(() => {
+    if (!mapRef.current) return;
+    applyTheme(mapRef.current, mapTheme);
+  }, [mapTheme, mapReady]);
 
   useEffect(() => {
     if (!mapRef.current || !currentPosition) return;
@@ -120,21 +162,41 @@ export function MapView({
         }, 0);
       }
 
+      // 本体の下にひと回り大きい半透明のシアン円を重ね、グローのような立体感を出す。
+      const glowIcon: google.maps.Symbol = {
+        path: google.maps.SymbolPath.CIRCLE,
+        scale: 13,
+        fillColor: "#00e5ff",
+        fillOpacity: 0.25,
+        strokeWeight: 0,
+      };
       const icon: google.maps.Symbol = {
         path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
         rotation: lastHeadingRef.current,
-        scale: 6,
-        fillColor: "#4c9a6a",
+        scale: 6.5,
+        fillColor: "#00e5ff",
         fillOpacity: 1,
-        strokeColor: "#0b0c0e",
+        strokeColor: "#0b0f14",
         strokeWeight: 2,
       };
+      if (!currentMarkerGlowRef.current) {
+        currentMarkerGlowRef.current = new google.maps.Marker({
+          map: mapRef.current,
+          position: currentPosition,
+          icon: glowIcon,
+          zIndex: 1,
+          clickable: false,
+        });
+      } else {
+        currentMarkerGlowRef.current.setPosition(currentPosition);
+      }
       if (!currentMarkerRef.current) {
         currentMarkerRef.current = new google.maps.Marker({
           map: mapRef.current,
           position: currentPosition,
           title: "現在地",
           icon,
+          zIndex: 2,
         });
       } else {
         currentMarkerRef.current.setPosition(currentPosition);
@@ -188,19 +250,35 @@ export function MapView({
     if (!routePolyline) {
       polylineRef.current?.setMap(null);
       polylineRef.current = null;
+      polylineGlowRef.current?.setMap(null);
+      polylineGlowRef.current = null;
       return;
     }
     let cancelled = false;
     void importLibrary("geometry").then(({ encoding }) => {
       if (cancelled || !mapRef.current) return;
       const path = encoding.decodePath(routePolyline);
+      // 太く薄いシアンの線を下に敷き、その上に本線を重ねてグローのような立体感を出す。
+      if (!polylineGlowRef.current) {
+        polylineGlowRef.current = new google.maps.Polyline({
+          map: mapRef.current,
+          path,
+          strokeColor: "#00e5ff",
+          strokeOpacity: 0.25,
+          strokeWeight: 11,
+          zIndex: 1,
+        });
+      } else {
+        polylineGlowRef.current.setPath(path);
+      }
       if (!polylineRef.current) {
         polylineRef.current = new google.maps.Polyline({
           map: mapRef.current,
           path,
           strokeColor: "#4c7093",
-          strokeOpacity: 0.9,
+          strokeOpacity: 0.95,
           strokeWeight: 5,
+          zIndex: 2,
         });
       } else {
         polylineRef.current.setPath(path);
@@ -241,8 +319,32 @@ export function MapView({
   }
 
   return (
-    <div className="relative flex flex-1">
-      <div ref={containerRef} className="flex-1 rounded-2xl border border-outline" />
+    <div
+      className={`relative flex flex-1 ${criticalMode ? "min-h-[280px]" : ""}`}
+    >
+      <div
+        ref={containerRef}
+        className={`flex-1 rounded-2xl border-2 bg-surface-raised-1 ${
+          criticalMode
+            ? "border-accent-urgent shadow-lg shadow-accent-urgent/30"
+            : "border-outline"
+        }`}
+      />
+      <div className="absolute left-3 top-3 flex gap-1 rounded-full border border-outline bg-surface-raised-1/90 p-1 shadow-lg">
+        {THEME_OPTIONS.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            onClick={() => setMapTheme(option.value)}
+            title={option.labelJa}
+            className={`rounded-full px-2 py-1 text-sm ${
+              mapTheme === option.value ? "pill-selected" : ""
+            }`}
+          >
+            {option.emoji}
+          </button>
+        ))}
+      </div>
       {!waypoint && !following && (
         <button
           type="button"

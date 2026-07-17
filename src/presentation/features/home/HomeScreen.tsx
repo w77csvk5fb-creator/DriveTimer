@@ -107,6 +107,7 @@ export function HomeScreen() {
         routePolyline={
           scenicWaypoint ? (displayRoutePolyline ?? undefined) : lastEta?.overviewPolyline
         }
+        criticalMode={isRedTone}
       />
 
       <button

@@ -21,8 +21,17 @@ export function RouteCard({ candidate, directDurationMs, selected, onSelect }: R
         selected ? "pill-selected border-accent-primary" : "border-outline"
       }`}
     >
-      <span className="text-sm font-semibold text-on-surface">
+      <span className="flex items-center gap-2 text-sm font-semibold text-on-surface">
         {presentation.emoji} {presentation.labelJa}
+        {candidate.usesHighway ? (
+          <span className="rounded-full bg-accent-warning/20 px-2 py-0.5 text-xs font-semibold text-accent-warning">
+            🛣️ 高速道路を利用
+          </span>
+        ) : (
+          <span className="rounded-full bg-accent-safe/15 px-2 py-0.5 text-xs font-semibold text-accent-safe">
+            高速道路なし
+          </span>
+        )}
       </span>
       <span className="text-xs text-on-surface-muted">
         所要時間 約{formatDurationJa(candidate.durationMs)}（直行より{formatDurationJa(deltaMs)}長い）

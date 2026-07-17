@@ -30,6 +30,7 @@ class FakeDirectionsRepository implements DirectionsRepository {
   constructor(
     private readonly directEta: EtaResult,
     private readonly byBearing: ReadonlyMap<number, RouteDetail>,
+    private readonly avoidHighwaysByBearing?: ReadonlyMap<number, RouteDetail>,
   ) {}
 
   async getTrafficAwareEta(): Promise<RouteDetail> {
@@ -44,10 +45,14 @@ class FakeDirectionsRepository implements DirectionsRepository {
     _origin: GeoPoint,
     waypoint: GeoPoint,
     _destination: GeoPoint,
-    _options?: RouteViaWaypointOptions,
+    options?: RouteViaWaypointOptions,
   ): Promise<RouteDetail> {
     const bearing = approximateBearingDeg(ORIGIN, waypoint);
-    const entry = this.byBearing.get(bearing);
+    const source =
+      options?.avoidHighways && this.avoidHighwaysByBearing
+        ? this.avoidHighwaysByBearing
+        : this.byBearing;
+    const entry = source.get(bearing);
     if (!entry) throw new Error(`no fixture for bearing ${bearing}`);
     return entry;
   }
@@ -167,6 +172,82 @@ describe("generateScenicRouteCandidates", () => {
 
     expect(result.candidates.length).toBeLessThanOrEqual(5);
   });
+
+  it("adds a no-highway alternative candidate when a route relies heavily on highways", async () => {
+    const targetDurationMs = 114 * 60_000;
+    const byBearing = new Map<number, RouteDetail>([
+      [0, makeRoute(targetDurationMs)],
+      [45, makeRoute(targetDurationMs * 3)],
+      [90, makeRoute(targetDurationMs * 3)],
+      [135, makeRoute(targetDurationMs * 3)],
+      [180, makeRoute(targetDurationMs * 3)],
+      [225, makeRoute(targetDurationMs * 3)],
+      [270, makeRoute(targetDurationMs * 3)],
+      [315, makeRoute(targetDurationMs * 3)],
+    ]);
+    // 高速道路を避けると所要時間が2倍かかる → highwayRatio=(2T-T)/2T=0.5、閾値(0.15)を大きく超える
+    const avoidHighwaysByBearing = new Map<number, RouteDetail>([
+      [0, makeRoute(targetDurationMs * 2)],
+    ]);
+    const repo = new FakeDirectionsRepository(
+      { durationMs: 30 * 60_000, distanceMeters: 20_000 },
+      byBearing,
+      avoidHighwaysByBearing,
+    );
+
+    const result = await generateScenicRouteCandidates({
+      directionsRepository: repo,
+      origin: ORIGIN,
+      destination: DESTINATION,
+      deadline: new Date(NOW.getTime() + 150 * 60_000),
+      safetyBufferMinutes: 0,
+      now: NOW,
+    });
+
+    const primary = result.candidates.find((c) => c.id === "bearing-0");
+    expect(primary?.usesHighway).toBe(true);
+
+    const alternative = result.candidates.find((c) => c.id === "bearing-0-no-highway");
+    expect(alternative).toBeDefined();
+    expect(alternative?.usesHighway).toBe(false);
+    expect(alternative?.durationMs).toBe(targetDurationMs * 2);
+    expect(alternative?.waypoint).toEqual(primary?.waypoint);
+  });
+
+  it("does not add a no-highway alternative when the route barely uses highways", async () => {
+    const targetDurationMs = 114 * 60_000;
+    const byBearing = new Map<number, RouteDetail>([
+      [0, makeRoute(targetDurationMs)],
+      [45, makeRoute(targetDurationMs * 3)],
+      [90, makeRoute(targetDurationMs * 3)],
+      [135, makeRoute(targetDurationMs * 3)],
+      [180, makeRoute(targetDurationMs * 3)],
+      [225, makeRoute(targetDurationMs * 3)],
+      [270, makeRoute(targetDurationMs * 3)],
+      [315, makeRoute(targetDurationMs * 3)],
+    ]);
+    // 高速道路を避けても所要時間はほぼ同じ → highwayRatioは閾値未満
+    const avoidHighwaysByBearing = new Map<number, RouteDetail>([
+      [0, makeRoute(targetDurationMs * 1.02)],
+    ]);
+    const repo = new FakeDirectionsRepository(
+      { durationMs: 30 * 60_000, distanceMeters: 20_000 },
+      byBearing,
+      avoidHighwaysByBearing,
+    );
+
+    const result = await generateScenicRouteCandidates({
+      directionsRepository: repo,
+      origin: ORIGIN,
+      destination: DESTINATION,
+      deadline: new Date(NOW.getTime() + 150 * 60_000),
+      safetyBufferMinutes: 0,
+      now: NOW,
+    });
+
+    expect(result.candidates.map((c) => c.id)).toEqual(["bearing-0"]);
+    expect(result.candidates[0].usesHighway).toBe(false);
+  });
 });
 
 describe("dedupeScenicRouteCandidates", () => {
@@ -188,6 +269,7 @@ describe("dedupeScenicRouteCandidates", () => {
       durationFitScore: combinedScore,
       combinedScore,
       overviewPolyline: "",
+      usesHighway: false,
     };
   }
 

@@ -74,3 +74,6 @@ export const SCENIC_ROUTE_MAX_RESULTS = 5;
 
 /** combinedScore = categoryConfidence*W + durationFitScore*(1-W) の重み */
 export const SCENIC_SCORE_CATEGORY_WEIGHT = 0.5;
+
+/** これを超えるhighwayRatioの候補は「高速道路を利用」表記とし、高速道路を使わない代替ルートも併せて提案する */
+export const SCENIC_ROUTE_HIGHWAY_USAGE_THRESHOLD = 0.15;

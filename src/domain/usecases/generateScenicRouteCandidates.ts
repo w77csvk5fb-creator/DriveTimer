@@ -12,6 +12,7 @@ import {
   SCENIC_ROUTE_MIN_RESULTS_TARGET,
   SCENIC_ROUTE_MAX_RESULTS,
   SCENIC_SCORE_CATEGORY_WEIGHT,
+  SCENIC_ROUTE_HIGHWAY_USAGE_THRESHOLD,
   DEFAULT_AVG_CRUISE_SPEED_KMH,
 } from "@/core/constants/appConstants";
 
@@ -142,14 +143,55 @@ export async function generateScenicRouteCandidates(
       durationFitScore: s.durationFitScore,
       combinedScore,
       overviewPolyline: s.normalRoute.overviewPolyline,
+      usesHighway: highwayRatio > SCENIC_ROUTE_HIGHWAY_USAGE_THRESHOLD,
     };
   });
 
   const dedupRadiusMeters = reachDistanceMeters * DEDUP_RADIUS_FRACTION;
-  const deduped = dedupeScenicRouteCandidates(candidates, dedupRadiusMeters);
+  const deduped = dedupeScenicRouteCandidates(candidates, dedupRadiusMeters).slice(
+    0,
+    SCENIC_ROUTE_MAX_RESULTS,
+  );
+
+  // 高速道路を有意に使う候補には、同じ経由地・avoidHighways版を使った代替ルートも併せて提案する。
+  const avoidRouteByBearing = new Map(
+    survivors.map((s, index) => [s.bearingDeg, avoidHighwaysRoutes[index]] as const),
+  );
+  const withHighwayAlternatives: ScenicRouteCandidate[] = deduped.flatMap((candidate) => {
+    if (!candidate.usesHighway) return [candidate];
+    const avoidRoute = avoidRouteByBearing.get(candidate.bearingDeg);
+    if (!avoidRoute) return [candidate];
+
+    const { category, confidence, windingRatio } = scoreRouteCategory({
+      origin: params.origin,
+      waypoint: candidate.waypoint,
+      destination: params.destination,
+      normalRoute: avoidRoute,
+      avoidHighwaysRoute: null,
+      now: params.now,
+    });
+    const noHighwayFitScore = durationFitScore(avoidRoute.durationMs, targetDurationMs, Infinity);
+    const alternative: ScenicRouteCandidate = {
+      id: `${candidate.id}-no-highway`,
+      waypoint: candidate.waypoint,
+      bearingDeg: candidate.bearingDeg,
+      category,
+      categoryConfidence: confidence,
+      durationMs: avoidRoute.durationMs,
+      distanceMeters: avoidRoute.distanceMeters,
+      highwayRatio: 0,
+      windingRatio,
+      durationFitScore: noHighwayFitScore,
+      combinedScore:
+        confidence * SCENIC_SCORE_CATEGORY_WEIGHT + noHighwayFitScore * (1 - SCENIC_SCORE_CATEGORY_WEIGHT),
+      overviewPolyline: avoidRoute.overviewPolyline,
+      usesHighway: false,
+    };
+    return [candidate, alternative];
+  });
 
   return {
-    candidates: deduped.slice(0, SCENIC_ROUTE_MAX_RESULTS),
+    candidates: withHighwayAlternatives,
     skippedReason: null,
     directDurationMs: direct.durationMs,
   };
