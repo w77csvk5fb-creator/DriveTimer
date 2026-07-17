@@ -192,16 +192,25 @@ export function SetupScreen() {
                   ))}
 
                   {selectedCandidateId && (
-                    <div className="flex h-56">
-                      <MapView
-                        currentPosition={scenicOrigin}
-                        destination={destination.point}
-                        waypoint={
-                          scenicResult.candidates.find((c) => c.id === selectedCandidateId)
-                            ?.waypoint ?? null
-                        }
-                      />
-                    </div>
+                    <>
+                      <div className="flex h-56">
+                        <MapView
+                          currentPosition={scenicOrigin}
+                          destination={destination.point}
+                          waypoint={
+                            scenicResult.candidates.find((c) => c.id === selectedCandidateId)
+                              ?.waypoint ?? null
+                          }
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedCandidateId(null)}
+                        className="self-start text-xs text-on-surface-muted underline"
+                      >
+                        選択を解除して経由せず出発する
+                      </button>
+                    </>
                   )}
 
                   <p className="text-xs text-on-surface-muted">
