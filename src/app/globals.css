@@ -6,8 +6,8 @@
  * 一目で見やすい配色トークンをここに集約する。
  */
 :root {
-  --surface-base: #0b0c0e;
-  --surface-raised-1: #17181b;
+  --surface-base: #0b0f14;
+  --surface-raised-1: #121821;
   --surface-raised-2: #202226;
   --on-surface: #f2f2f0;
   --on-surface-muted: #9a9ca3;
@@ -18,6 +18,7 @@
   --accent-warning: #e0a733;
   --accent-urgent: #d8232a;
   --accent-safe: #4c9a6a;
+  --accent-cyan: #00e5ff;
 }
 
 @theme inline {
@@ -33,6 +34,7 @@
   --color-accent-warning: var(--accent-warning);
   --color-accent-urgent: var(--accent-urgent);
   --color-accent-safe: var(--accent-safe);
+  --color-accent-cyan: var(--accent-cyan);
   --font-sans: var(--font-noto-sans-jp);
 }
 
@@ -43,6 +45,11 @@ html {
 body {
   background: var(--surface-base);
   color: var(--on-surface);
+}
+
+/* アイコンに少量のシアングローを添えて高級感を出す(仕様: アクセントカラーはアイコン・グローに少量使用)。 */
+.icon-glow {
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--accent-cyan) 70%, transparent));
 }
 
 /* ボタンタップ時の押下フィードバック。transform/opacityのみでGPU描画、レイアウト再計算なし。 */

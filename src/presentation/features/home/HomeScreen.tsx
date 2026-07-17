@@ -112,7 +112,7 @@ export function HomeScreen() {
       <button
         type="button"
         onClick={endDrive}
-        className="rounded-xl border border-outline px-4 py-2.5 font-semibold text-on-surface"
+        className="h-[68px] rounded-[20px] bg-gradient-to-b from-accent-urgent to-[#a01920] text-lg font-bold text-on-surface shadow-lg shadow-accent-urgent/30"
       >
         ドライブ終了
       </button>

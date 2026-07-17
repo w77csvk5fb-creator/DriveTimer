@@ -17,8 +17,8 @@ export function TurnByTurnBanner({ step }: TurnByTurnBannerProps) {
   const presentation = getManeuverPresentation(step.maneuver);
 
   return (
-    <div className="flex items-center gap-3 rounded-2xl bg-accent-safe/90 px-4 py-3 text-on-surface">
-      <span className="text-3xl leading-none">{presentation.emoji}</span>
+    <div className="flex items-center gap-3 rounded-2xl bg-gradient-to-br from-accent-primary to-accent-info px-4 py-3 text-on-surface shadow-lg shadow-accent-primary/20">
+      <span className="icon-glow text-3xl leading-none">{presentation.emoji}</span>
       <div className="flex flex-col">
         <span className="text-xl font-bold tabular-nums">
           {formatDistanceJa(step.distanceMeters)}

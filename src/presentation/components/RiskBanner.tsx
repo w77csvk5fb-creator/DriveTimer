@@ -19,7 +19,7 @@ export function RiskBanner({ status }: RiskBannerProps) {
       className={`flex flex-col items-center gap-1 rounded-2xl border px-6 py-5 text-center ${presentation.bgClass} ${presentation.borderClass}`}
     >
       <p className={`text-xl font-semibold ${presentation.textClass}`}>
-        {presentation.emoji} {presentation.labelJa}
+        <span className="icon-glow">{presentation.emoji}</span> {presentation.labelJa}
       </p>
       <p className="text-3xl font-bold tabular-nums text-on-surface">
         あと {formatDurationJa(status.freeTimeRemainingMs)} 走れます
