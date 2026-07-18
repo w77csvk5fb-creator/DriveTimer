@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { durationFitScore, scoreRouteCategory } from "./routeCategoryScorer";
+import { durationFitScore, isHighwayInstruction, scoreRouteCategory } from "./routeCategoryScorer";
 import type { RouteDetail } from "@/domain/repositories/directionsRepository";
 
 const ORIGIN = { lat: 35.65, lng: 139.7 };
@@ -28,6 +28,7 @@ function step(instructionText: string): RouteDetail["steps"][number] {
     maneuver: null,
     startLocation: { lat: 0, lng: 0 },
     endLocation: { lat: 0, lng: 0 },
+    polyline: "",
   };
 }
 
@@ -150,5 +151,19 @@ describe("durationFitScore", () => {
 
   it("returns 0 when the target duration is zero or negative", () => {
     expect(durationFitScore(1000, 0, 0.4)).toBe(0);
+  });
+});
+
+describe("isHighwayInstruction", () => {
+  it("returns true for instructions mentioning a highway/expressway", () => {
+    expect(isHighwayInstruction("首都高速に入る")).toBe(true);
+    expect(isHighwayInstruction("東名高速道路を進む")).toBe(true);
+    expect(isHighwayInstruction("圏央道自動車道へ")).toBe(true);
+    expect(isHighwayInstruction("東京IC方面へ")).toBe(true);
+  });
+
+  it("returns false for ordinary surface-street instructions", () => {
+    expect(isHighwayInstruction("市街地を右折")).toBe(false);
+    expect(isHighwayInstruction("海岸沿いを直進")).toBe(false);
   });
 });

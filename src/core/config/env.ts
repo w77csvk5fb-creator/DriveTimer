@@ -10,10 +10,14 @@ function isConfigured(value: string | undefined): boolean {
  */
 export const clientEnv = {
   googleMapsJsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_JS_API_KEY,
+  /** Vector Map ID。設定時のみ地図がベクターレンダリングになり、回転・チルトが機能する。 */
+  googleMapsMapId: process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID,
   firebaseApiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   firebaseAuthDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
   firebaseProjectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
 } as const;
+
+export const isVectorMapConfigured = isConfigured(clientEnv.googleMapsMapId);
 
 export const isGoogleMapsConfigured = isConfigured(clientEnv.googleMapsJsApiKey);
 

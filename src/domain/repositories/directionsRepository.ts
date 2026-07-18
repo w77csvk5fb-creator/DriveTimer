@@ -17,6 +17,8 @@ export interface RouteStepSummary {
   readonly maneuver: string | null;
   readonly startLocation: GeoPoint;
   readonly endLocation: GeoPoint;
+  /** このステップ区間のエンコード済みポリライン。取得できない場合は空文字。 */
+  readonly polyline: string;
 }
 
 export interface RouteDetail extends EtaResult {

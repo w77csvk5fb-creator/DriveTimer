@@ -207,6 +207,7 @@ export function SetupScreen() {
                         destination={destination.point}
                         waypoint={selectedCandidate?.waypoint ?? null}
                         routePolyline={selectedCandidate?.overviewPolyline}
+                        highwaySegmentPolylines={selectedCandidate?.highwaySegmentPolylines}
                       />
                     </div>
                   );

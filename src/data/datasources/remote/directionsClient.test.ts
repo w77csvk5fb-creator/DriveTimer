@@ -123,6 +123,7 @@ describe("RemoteDirectionsRepository", () => {
                     maneuver: "turn-right",
                     start_location: { lat: 35.61, lng: 139.7 },
                     end_location: { lat: 35.62, lng: 139.7 },
+                    polyline: { points: "step_poly_1" },
                   },
                   {
                     html_instructions: "山道を直進",
@@ -152,6 +153,7 @@ describe("RemoteDirectionsRepository", () => {
           maneuver: "turn-right",
           startLocation: { lat: 35.61, lng: 139.7 },
           endLocation: { lat: 35.62, lng: 139.7 },
+          polyline: "step_poly_1",
         },
         {
           instructionText: "山道を直進",
@@ -160,6 +162,7 @@ describe("RemoteDirectionsRepository", () => {
           maneuver: null,
           startLocation: { lat: 0, lng: 0 },
           endLocation: { lat: 0, lng: 0 },
+          polyline: "",
         },
       ]);
     });

@@ -62,6 +62,18 @@ function makeRoute(durationMs: number): RouteDetail {
   return { durationMs, distanceMeters: durationMs * 10, steps: [], overviewPolyline: "" };
 }
 
+function makeStep(instructionText: string, polyline: string): RouteDetail["steps"][number] {
+  return {
+    instructionText,
+    durationMs: 5 * 60_000,
+    distanceMeters: 3_000,
+    maneuver: null,
+    startLocation: { lat: 0, lng: 0 },
+    endLocation: { lat: 0, lng: 0 },
+    polyline,
+  };
+}
+
 describe("generateScenicRouteCandidates", () => {
   it("returns insufficientFreeTime when free time is below the minimum threshold", async () => {
     const repo = new FakeDirectionsRepository(
@@ -248,6 +260,45 @@ describe("generateScenicRouteCandidates", () => {
     expect(result.candidates.map((c) => c.id)).toEqual(["bearing-0"]);
     expect(result.candidates[0].usesHighway).toBe(false);
   });
+
+  it("extracts only the highway-flagged steps' polylines for the map preview", async () => {
+    const targetDurationMs = 114 * 60_000;
+    const routeWithMixedSteps: RouteDetail = {
+      durationMs: targetDurationMs,
+      distanceMeters: targetDurationMs * 10,
+      overviewPolyline: "overview_poly",
+      steps: [
+        makeStep("東名高速道路に入る", "highway_segment_poly"),
+        makeStep("一般道を直進", "surface_segment_poly"),
+      ],
+    };
+    const byBearing = new Map<number, RouteDetail>([
+      [0, routeWithMixedSteps],
+      [45, makeRoute(targetDurationMs * 3)],
+      [90, makeRoute(targetDurationMs * 3)],
+      [135, makeRoute(targetDurationMs * 3)],
+      [180, makeRoute(targetDurationMs * 3)],
+      [225, makeRoute(targetDurationMs * 3)],
+      [270, makeRoute(targetDurationMs * 3)],
+      [315, makeRoute(targetDurationMs * 3)],
+    ]);
+    const repo = new FakeDirectionsRepository(
+      { durationMs: 30 * 60_000, distanceMeters: 20_000 },
+      byBearing,
+    );
+
+    const result = await generateScenicRouteCandidates({
+      directionsRepository: repo,
+      origin: ORIGIN,
+      destination: DESTINATION,
+      deadline: new Date(NOW.getTime() + 150 * 60_000),
+      safetyBufferMinutes: 0,
+      now: NOW,
+    });
+
+    const primary = result.candidates.find((c) => c.id === "bearing-0");
+    expect(primary?.highwaySegmentPolylines).toEqual(["highway_segment_poly"]);
+  });
 });
 
 describe("dedupeScenicRouteCandidates", () => {
@@ -270,6 +321,7 @@ describe("dedupeScenicRouteCandidates", () => {
       combinedScore,
       overviewPolyline: "",
       usesHighway: false,
+      highwaySegmentPolylines: [],
     };
   }
 

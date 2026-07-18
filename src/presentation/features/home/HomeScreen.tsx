@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useActiveDriveStore } from "@/presentation/stores/activeDriveStore";
 import { RiskBanner } from "@/presentation/components/RiskBanner";
-import { ArrivalGuaranteeBanner } from "@/presentation/components/ArrivalGuaranteeBanner";
 import { MapView } from "@/presentation/components/MapView";
 import { DriveSummaryCard } from "@/presentation/components/DriveSummaryCard";
 import { AdviceList } from "@/presentation/components/AdviceList";
@@ -88,12 +87,7 @@ export function HomeScreen() {
       )}
 
       {driveStatus?.kind === "onTrack" && <RiskBanner status={driveStatus} />}
-      {driveStatus?.kind === "arrivalGuaranteeFailure" && (
-        <>
-          <ArrivalGuaranteeBanner status={driveStatus} />
-          <FastestRouteButton />
-        </>
-      )}
+      {driveStatus?.kind === "arrivalGuaranteeFailure" && <FastestRouteButton />}
       {!driveStatus && !locationError && (
         <p className="text-center text-sm text-on-surface-muted">現在地を取得しています…</p>
       )}

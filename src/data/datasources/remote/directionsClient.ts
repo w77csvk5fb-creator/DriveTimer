@@ -19,6 +19,7 @@ interface DirectionsApiStep {
   readonly maneuver?: string;
   readonly start_location?: DirectionsApiLatLng;
   readonly end_location?: DirectionsApiLatLng;
+  readonly polyline?: { readonly points?: string };
 }
 
 interface DirectionsApiLeg {
@@ -106,6 +107,7 @@ function extractRouteDetail(data: DirectionsApiResponse): RouteDetail {
     endLocation: step.end_location
       ? { lat: step.end_location.lat, lng: step.end_location.lng }
       : { lat: 0, lng: 0 },
+    polyline: step.polyline?.points ?? "",
   }));
   return { ...eta, steps, overviewPolyline: route.overview_polyline?.points ?? "" };
 }

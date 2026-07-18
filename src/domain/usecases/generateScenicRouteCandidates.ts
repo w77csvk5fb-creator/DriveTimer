@@ -2,7 +2,11 @@ import type { GeoPoint } from "@/domain/entities/geoPoint";
 import type { ScenicRouteCandidate } from "@/domain/entities/scenicRouteCandidate";
 import type { DirectionsRepository, RouteDetail } from "@/domain/repositories/directionsRepository";
 import { computeDriveStatus } from "@/domain/services/turnBackCalculator";
-import { durationFitScore, scoreRouteCategory } from "@/domain/services/routeCategoryScorer";
+import {
+  durationFitScore,
+  isHighwayInstruction,
+  scoreRouteCategory,
+} from "@/domain/services/routeCategoryScorer";
 import { destinationPoint, haversineDistanceMeters } from "@/core/utils/geoUtils";
 import {
   SCENIC_ROUTE_CANDIDATE_BEARINGS_DEG,
@@ -43,6 +47,13 @@ interface Survivor {
   readonly waypoint: GeoPoint;
   readonly normalRoute: RouteDetail;
   readonly durationFitScore: number;
+}
+
+/** 案内文が高速道路区間と判定されたステップのポリラインだけを抽出する(地図プレビューの色分け用)。 */
+function extractHighwaySegmentPolylines(route: RouteDetail): readonly string[] {
+  return route.steps
+    .filter((step) => isHighwayInstruction(step.instructionText) && step.polyline !== "")
+    .map((step) => step.polyline);
 }
 
 /**
@@ -144,6 +155,7 @@ export async function generateScenicRouteCandidates(
       combinedScore,
       overviewPolyline: s.normalRoute.overviewPolyline,
       usesHighway: highwayRatio > SCENIC_ROUTE_HIGHWAY_USAGE_THRESHOLD,
+      highwaySegmentPolylines: extractHighwaySegmentPolylines(s.normalRoute),
     };
   });
 
@@ -186,6 +198,7 @@ export async function generateScenicRouteCandidates(
         confidence * SCENIC_SCORE_CATEGORY_WEIGHT + noHighwayFitScore * (1 - SCENIC_SCORE_CATEGORY_WEIGHT),
       overviewPolyline: avoidRoute.overviewPolyline,
       usesHighway: false,
+      highwaySegmentPolylines: [],
     };
     return [candidate, alternative];
   });

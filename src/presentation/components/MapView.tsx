@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { importLibrary, setOptions } from "@googlemaps/js-api-loader";
 import type { GeoPoint } from "@/domain/entities/geoPoint";
-import { clientEnv, isGoogleMapsConfigured } from "@/core/config/env";
+import { clientEnv, isGoogleMapsConfigured, isVectorMapConfigured } from "@/core/config/env";
 import { bearingBetween, haversineDistanceMeters } from "@/core/utils/geoUtils";
 import { useSettingsStore, type MapThemeMode } from "@/presentation/stores/settingsStore";
 
@@ -19,6 +19,8 @@ interface MapViewProps {
   readonly waypoint?: GeoPoint | null;
   /** エンコード済みポリライン。指定時、現在地から目的地までの経路を線で描画する。 */
   readonly routePolyline?: string | null;
+  /** 高速道路区間と判定されたステップのエンコード済みポリライン一覧。ルート線の上に別色で重ねる。 */
+  readonly highwaySegmentPolylines?: readonly string[];
   /** 到着保証モード等、緊急度の高い状態であることを示す。枠を強調し最低高さを確保する。 */
   readonly criticalMode?: boolean;
 }
@@ -47,13 +49,32 @@ const THEME_OPTIONS: ReadonlyArray<{ value: MapThemeMode; emoji: string; labelJa
   { value: "satellite", emoji: "🛰️", labelJa: "航空写真" },
 ];
 
+// 走行ルート線の色。地図の背景色によって見づらくならないよう、テーマごとに視認性の高い色を選ぶ。
+function getRouteLineColor(theme: MapThemeMode): string {
+  switch (theme) {
+    case "light":
+      return "#1a56db"; // 濃紺。明るい背景でもくっきり見える
+    case "satellite":
+      return "#ffd60a"; // 黄色。航空写真の自然な色に紛れない
+    case "dark":
+    default:
+      return "#5b9bd5"; // 明るい青。ダーク背景の道路色との対比が強い
+  }
+}
+
+const HIGHWAY_SEGMENT_COLOR = "#ff9800"; // 高速道路区間を示すオレンジ。通常ルート線と明確に区別する
+
 function applyTheme(map: google.maps.Map, theme: MapThemeMode) {
   if (theme === "satellite") {
     map.setMapTypeId(google.maps.MapTypeId.HYBRID);
     return;
   }
   map.setMapTypeId(google.maps.MapTypeId.ROADMAP);
-  map.setOptions({ styles: theme === "dark" ? DARK_MAP_STYLE : LIGHT_MAP_STYLE });
+  // Vector Map(mapId指定)ではJSON styles指定は無視される(警告の原因にもなる)ため、
+  // 見た目はCloud Console側で紐付けたスタイルに委ねる。
+  if (!isVectorMapConfigured) {
+    map.setOptions({ styles: theme === "dark" ? DARK_MAP_STYLE : LIGHT_MAP_STYLE });
+  }
 }
 
 let optionsInitialized = false;
@@ -69,6 +90,7 @@ export function MapView({
   destination,
   waypoint,
   routePolyline,
+  highwaySegmentPolylines,
   criticalMode = false,
 }: MapViewProps) {
   const mapTheme = useSettingsStore((s) => s.mapTheme);
@@ -82,6 +104,7 @@ export function MapView({
   const waypointMarkerRef = useRef<google.maps.Marker | null>(null);
   const polylineGlowRef = useRef<google.maps.Polyline | null>(null);
   const polylineRef = useRef<google.maps.Polyline | null>(null);
+  const highwaySegmentPolylinesRef = useRef<google.maps.Polyline[]>([]);
   const lastHeadingPositionRef = useRef<GeoPoint | null>(null);
   const lastHeadingRef = useRef(0);
   // 地図オブジェクトの生成は非同期。生成完了前にdestination等が確定済みだと、
@@ -104,12 +127,15 @@ export function MapView({
         center: currentPosition ?? destination ?? { lat: 35.681236, lng: 139.767125 },
         zoom: 13,
         disableDefaultUI: true,
-        // 回転はユーザーが操作できるよう有効化する。rotateControlは45度航空写真が
-        // 利用可能な地域でしか表示されないため、gestureHandlingで2本指回転ジェスチャー
-        // 自体も常に効くようにしておく(モバイルでの主な操作手段)。
+        // mapId指定時はベクターレンダリングになり、setHeading()/setTilt()およびユーザーの
+        // 回転・チルト操作が通常の道路地図上でも実際に機能するようになる(未指定時は
+        // 45度航空写真が利用可能な一部地域でしか効かない)。
+        ...(isVectorMapConfigured ? { mapId: clientEnv.googleMapsMapId } : {}),
         rotateControl: true,
         rotateControlOptions: { position: google.maps.ControlPosition.RIGHT_BOTTOM },
         gestureHandling: "greedy",
+        headingInteractionEnabled: true,
+        tiltInteractionEnabled: true,
       });
       applyTheme(mapRef.current, mapTheme);
       mapRef.current.addListener("dragstart", () => {
@@ -275,19 +301,48 @@ export function MapView({
         polylineRef.current = new google.maps.Polyline({
           map: mapRef.current,
           path,
-          strokeColor: "#4c7093",
+          strokeColor: getRouteLineColor(mapTheme),
           strokeOpacity: 0.95,
           strokeWeight: 5,
           zIndex: 2,
         });
       } else {
         polylineRef.current.setPath(path);
+        polylineRef.current.setOptions({ strokeColor: getRouteLineColor(mapTheme) });
       }
     });
     return () => {
       cancelled = true;
     };
-  }, [routePolyline, mapReady]);
+  }, [routePolyline, mapReady, mapTheme]);
+
+  // 高速道路区間(候補生成時に案内文から判定済み)を、通常のルート線の上に別色で重ねて表示する。
+  useEffect(() => {
+    if (!mapRef.current) return;
+    highwaySegmentPolylinesRef.current.forEach((line) => line.setMap(null));
+    highwaySegmentPolylinesRef.current = [];
+    if (!highwaySegmentPolylines || highwaySegmentPolylines.length === 0) return;
+
+    let cancelled = false;
+    void importLibrary("geometry").then(({ encoding }) => {
+      const map = mapRef.current;
+      if (cancelled || !map) return;
+      highwaySegmentPolylinesRef.current = highwaySegmentPolylines.map(
+        (encoded) =>
+          new google.maps.Polyline({
+            map,
+            path: encoding.decodePath(encoded),
+            strokeColor: HIGHWAY_SEGMENT_COLOR,
+            strokeOpacity: 1,
+            strokeWeight: 5,
+            zIndex: 3,
+          }),
+      );
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [highwaySegmentPolylines, mapReady]);
 
   // ルートプレビュー用: 経由地がある間は現在地・経由地・目的地の3点が収まるよう表示範囲を合わせる
   useEffect(() => {

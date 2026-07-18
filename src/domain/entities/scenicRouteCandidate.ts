@@ -21,4 +21,6 @@ export interface ScenicRouteCandidate {
   readonly overviewPolyline: string;
   /** highwayRatioが閾値を超え、高速道路を有意に利用するルートかどうか */
   readonly usesHighway: boolean;
+  /** 案内文から高速道路区間と判定されたステップのポリライン一覧(地図プレビューで別色表示するため)。 */
+  readonly highwaySegmentPolylines: readonly string[];
 }
