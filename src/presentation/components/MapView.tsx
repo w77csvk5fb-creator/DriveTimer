@@ -233,9 +233,15 @@ export function MapView({
         fillOpacity: 0.25,
         strokeWeight: 0,
       };
+      // SymbolのrotationはGoogle Maps APIの仕様上「画面座標系での回転」であり、
+      // map.setHeading()による地図自体の回転には追従しない。そのため絶対方位から
+      // 現在の地図headingを差し引き、画面上での相対角度に変換する。追従モード中は
+      // 地図headingが進行方向と一致する(上のsetHeading呼び出し)ため相対角度は常に0となり、
+      // 矢印は画面の真上を向き続ける(典型的なナビアプリの表示)。
+      const mapHeading = mapRef.current.getHeading() ?? 0;
       const icon: google.maps.Symbol = {
         path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
-        rotation: lastHeadingRef.current,
+        rotation: lastHeadingRef.current - mapHeading,
         scale: 6.5,
         fillColor: "#00e5ff",
         fillOpacity: 1,
