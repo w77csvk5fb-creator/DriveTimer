@@ -70,13 +70,19 @@ function applyTheme(map: google.maps.Map, theme: MapThemeMode) {
     return;
   }
   map.setMapTypeId(google.maps.MapTypeId.ROADMAP);
-  if (isVectorMapConfigured) {
-    // Vector Map(mapId指定)ではJSON styles指定は無視される。ダーク/ライトそれぞれの
-    // Cloud Console側スタイルは同じMap IDに両方登録済みで、colorSchemeでどちらを見せるか切り替える。
-    map.setOptions({ colorScheme: theme === "light" ? "LIGHT" : "DARK" });
-  } else {
+  // Vector Map(mapId指定)ではJSON styles指定は無視される(見た目はcolorSchemeで切り替える。
+  // colorScheme自体はmapId同様、地図生成後には変更できないため、ここではなく地図生成時にのみ渡す)。
+  if (!isVectorMapConfigured) {
     map.setOptions({ styles: theme === "dark" ? DARK_MAP_STYLE : LIGHT_MAP_STYLE });
   }
+}
+
+/**
+ * テーマに応じたcolorSchemeを返す。航空写真は常にラスター表示でcolorSchemeの影響を受けないため、
+ * ダークのままにして地図の作り直しを避ける(切り替えが必要なのはダーク⇔ライトの時だけ)。
+ */
+function resolveColorScheme(theme: MapThemeMode): "DARK" | "LIGHT" {
+  return theme === "light" ? "LIGHT" : "DARK";
 }
 
 let optionsInitialized = false;
@@ -111,12 +117,16 @@ export function MapView({
   const lastHeadingRef = useRef(0);
   // 地図オブジェクトの生成は非同期。生成完了前にdestination等が確定済みだと、
   // それらのprop自体は二度と変化せず対応するeffectが再実行されないままになるため、
-  // 生成完了を状態として持ち、他の全effectの依存配列に加えて再評価を強制する。
-  const [mapReady, setMapReady] = useState(false);
+  // 生成完了を状態(世代カウンタ)として持ち、他の全effectの依存配列に加えて再評価を強制する。
+  // colorSchemeはmapId同様、地図生成後には変更できないため、ダーク⇔ライト切り替え時は
+  // 地図インスタンスごと作り直す必要があり、単純な真偽値ではなく世代を増やすカウンタにしている。
+  const [mapGeneration, setMapGeneration] = useState(0);
   // ユーザーがピンチ/ドラッグで地図を操作した間は自動追従を止める。
   // 自分自身のpanTo/setZoom呼び出しをユーザー操作と誤検知しないためのフラグ。
   const isProgrammaticUpdateRef = useRef(false);
   const [following, setFollowing] = useState(true);
+
+  const resolvedColorScheme = resolveColorScheme(mapTheme);
 
   useEffect(() => {
     if (!isGoogleMapsConfigured || !containerRef.current) return;
@@ -125,6 +135,26 @@ export function MapView({
     ensureMapsApiOptions();
     void importLibrary("maps").then(({ Map }) => {
       if (cancelled || !containerRef.current) return;
+
+      // colorSchemeは生成後の地図インスタンスでは変更できないため、ダーク⇔ライトで
+      // 値が変わる場合はここで地図を作り直す。古い地図が残したマーカー/ポリラインの参照も
+      // 破棄し、他のeffectがmapGenerationの変化を検知して新しい地図の上に作り直す。
+      currentMarkerRef.current?.setMap(null);
+      currentMarkerRef.current = null;
+      currentMarkerGlowRef.current?.setMap(null);
+      currentMarkerGlowRef.current = null;
+      destinationMarkerRef.current?.setMap(null);
+      destinationMarkerRef.current = null;
+      waypointMarkerRef.current?.setMap(null);
+      waypointMarkerRef.current = null;
+      polylineRef.current?.setMap(null);
+      polylineRef.current = null;
+      polylineGlowRef.current?.setMap(null);
+      polylineGlowRef.current = null;
+      highwaySegmentPolylinesRef.current.forEach((line) => line.setMap(null));
+      highwaySegmentPolylinesRef.current = [];
+      containerRef.current.innerHTML = "";
+
       mapRef.current = new Map(containerRef.current, {
         center: currentPosition ?? destination ?? { lat: 35.681236, lng: 139.767125 },
         zoom: 13,
@@ -132,8 +162,10 @@ export function MapView({
         // mapId指定時はベクターレンダリングになり、setHeading()/setTilt()およびユーザーの
         // 回転・チルト操作が通常の道路地図上でも実際に機能するようになる(未指定時は
         // 45度航空写真が利用可能な一部地域でしか効かない)。ダーク/ライト両方のCloud Console
-        // スタイルを同じmapIdに登録し、colorSchemeで見た目を切り替える(applyTheme参照)。
-        ...(isVectorMapConfigured ? { mapId: clientEnv.googleMapsMapId } : {}),
+        // スタイルを同じmapIdに登録し、生成時のcolorSchemeでどちらを見せるか決める。
+        ...(isVectorMapConfigured
+          ? { mapId: clientEnv.googleMapsMapId, colorScheme: resolvedColorScheme }
+          : {}),
         rotateControl: true,
         rotateControlOptions: { position: google.maps.ControlPosition.RIGHT_BOTTOM },
         gestureHandling: "greedy",
@@ -147,21 +179,23 @@ export function MapView({
       mapRef.current.addListener("zoom_changed", () => {
         if (!isProgrammaticUpdateRef.current) setFollowing(false);
       });
-      setMapReady(true);
+      setFollowing(true);
+      setMapGeneration((g) => g + 1);
     });
 
     return () => {
       cancelled = true;
     };
-    // 初回マウント時にのみ地図を生成する(以後の中心移動/マーカー更新は別のeffectで行う)
+    // 初回マウント時、およびcolorSchemeの切り替えが必要な時(ダーク⇔ライトなど)にのみ地図を作り直す。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [resolvedColorScheme]);
 
-  // テーマ切り替え(ユーザー操作による設定変更)を既存の地図インスタンスへ反映する。
+  // テーマ切り替え(ユーザー操作による設定変更)を既存の地図インスタンスへ反映する
+  // (mapTypeId切り替え、および非Vector Map時のJSONスタイル切り替え。colorSchemeは対象外)。
   useEffect(() => {
     if (!mapRef.current) return;
     applyTheme(mapRef.current, mapTheme);
-  }, [mapTheme, mapReady]);
+  }, [mapTheme, mapGeneration]);
 
   useEffect(() => {
     if (!mapRef.current || !currentPosition) return;
@@ -244,7 +278,7 @@ export function MapView({
     } else {
       currentMarkerRef.current.setPosition(currentPosition);
     }
-  }, [currentPosition, mapReady, waypoint, following]);
+  }, [currentPosition, mapGeneration, waypoint, following]);
 
   useEffect(() => {
     if (!mapRef.current || !destination || destinationMarkerRef.current) return;
@@ -253,7 +287,7 @@ export function MapView({
       position: destination,
       title: "目的地",
     });
-  }, [destination, mapReady]);
+  }, [destination, mapGeneration]);
 
   useEffect(() => {
     if (!mapRef.current) return;
@@ -272,7 +306,7 @@ export function MapView({
     } else {
       waypointMarkerRef.current.setPosition(waypoint);
     }
-  }, [waypoint, mapReady]);
+  }, [waypoint, mapGeneration]);
 
   useEffect(() => {
     if (!mapRef.current) return;
@@ -317,7 +351,7 @@ export function MapView({
     return () => {
       cancelled = true;
     };
-  }, [routePolyline, mapReady, mapTheme]);
+  }, [routePolyline, mapGeneration, mapTheme]);
 
   // 高速道路区間(候補生成時に案内文から判定済み)を、通常のルート線の上に別色で重ねて表示する。
   useEffect(() => {
@@ -345,7 +379,7 @@ export function MapView({
     return () => {
       cancelled = true;
     };
-  }, [highwaySegmentPolylines, mapReady]);
+  }, [highwaySegmentPolylines, mapGeneration]);
 
   // ルートプレビュー用: 経由地がある間は現在地・経由地・目的地の3点が収まるよう表示範囲を合わせる
   useEffect(() => {
@@ -355,7 +389,7 @@ export function MapView({
     if (currentPosition) bounds.extend(currentPosition);
     if (destination) bounds.extend(destination);
     mapRef.current.fitBounds(bounds, 32);
-  }, [waypoint, currentPosition, destination, mapReady]);
+  }, [waypoint, currentPosition, destination, mapGeneration]);
 
   if (!isGoogleMapsConfigured) {
     return (
