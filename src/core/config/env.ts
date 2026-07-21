@@ -12,17 +12,16 @@ export const clientEnv = {
   googleMapsJsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_JS_API_KEY,
   /**
    * Vector Map ID。設定時のみ地図がベクターレンダリングになり、回転・チルトが機能する。
-   * mapIdは生成後の地図インスタンスでは変更できない(スタイルもCloud Console側の紐付けに従う)ため、
-   * ダーク/ライトそれぞれに別のMap IDを用意する。ライト未設定時はダーク用IDにフォールバックする。
+   * ダーク/ライト両方のCloud Consoleスタイルを同じMap IDに登録し、地図のcolorSchemeオプションで
+   * どちらを見せるか切り替える(mapId自体は1つで済む)。
    */
-  googleMapsMapIdDark: process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID_DARK,
-  googleMapsMapIdLight: process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID_LIGHT,
+  googleMapsMapId: process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID,
   firebaseApiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   firebaseAuthDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
   firebaseProjectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
 } as const;
 
-export const isVectorMapConfigured = isConfigured(clientEnv.googleMapsMapIdDark);
+export const isVectorMapConfigured = isConfigured(clientEnv.googleMapsMapId);
 
 export const isGoogleMapsConfigured = isConfigured(clientEnv.googleMapsJsApiKey);
 
