@@ -42,7 +42,6 @@ describe("scoreRouteCategory", () => {
         distanceMeters: 20_000,
         steps: [step("海岸沿いを右折"), step("コーストラインを直進")],
       }),
-      avoidHighwaysRoute: route({ durationMs: 20 * 60_000, steps: [] }),
       now: DAYTIME,
     });
     expect(result.category).toBe("coastal");
@@ -57,7 +56,6 @@ describe("scoreRouteCategory", () => {
         distanceMeters: 40_000, // 直線距離よりかなり長い(曲がりくねっている)
         steps: [step("峠道を登る"), step("山道が続く")],
       }),
-      avoidHighwaysRoute: null,
       now: DAYTIME,
     });
     expect(result.category).toBe("mountain");
@@ -72,7 +70,6 @@ describe("scoreRouteCategory", () => {
         distanceMeters: 45_000,
         steps: [step("ワインディングロードを走行"), step("カーブが続きます")],
       }),
-      avoidHighwaysRoute: null,
       now: DAYTIME,
     });
     expect(result.category).toBe("winding");
@@ -88,7 +85,6 @@ describe("scoreRouteCategory", () => {
         durationMs: 10 * 60_000,
         steps: [step("市街地を経由"), step("中心街を直進")],
       }),
-      avoidHighwaysRoute: route({ durationMs: 20 * 60_000, steps: [] }),
       now: DAYTIME,
     });
     expect(result.category).toBe("urban");
@@ -103,7 +99,6 @@ describe("scoreRouteCategory", () => {
         distanceMeters: 18_000,
         steps: [step("絶景ポイントを通過"), step("展望台からの眺め")],
       }),
-      avoidHighwaysRoute: route({ durationMs: 20 * 60_000, steps: [] }),
       now: DAYTIME,
     });
     expect(result.category).toBe("scenic");
@@ -115,7 +110,6 @@ describe("scoreRouteCategory", () => {
       waypoint: WAYPOINT,
       destination: DESTINATION,
       normalRoute: route({ steps: [step("市街地を経由")] }), // urban色の強い内容でも
-      avoidHighwaysRoute: null,
       now: NIGHTTIME,
     });
     expect(result.category).toBe("nightView");
@@ -127,11 +121,41 @@ describe("scoreRouteCategory", () => {
       waypoint: WAYPOINT,
       destination: DESTINATION,
       normalRoute: route({ distanceMeters: 0, steps: [] }),
-      avoidHighwaysRoute: null,
       now: DAYTIME,
     });
     expect(result.category).toBe("urban");
     expect(result.confidence).toBeCloseTo(0.3, 5);
+  });
+
+  it("computes highwayRatio from the distance-weighted proportion of highway-flagged steps", () => {
+    const result = scoreRouteCategory({
+      origin: ORIGIN,
+      waypoint: WAYPOINT,
+      destination: DESTINATION,
+      normalRoute: route({
+        distanceMeters: 10_000,
+        steps: [
+          { ...step("東名高速道路を進む"), distanceMeters: 8_000 },
+          { ...step("一般道を直進"), distanceMeters: 2_000 },
+        ],
+      }),
+      now: DAYTIME,
+    });
+    expect(result.highwayRatio).toBeCloseTo(0.8, 5);
+  });
+
+  it("returns a highwayRatio of 0 when no step mentions a highway", () => {
+    const result = scoreRouteCategory({
+      origin: ORIGIN,
+      waypoint: WAYPOINT,
+      destination: DESTINATION,
+      normalRoute: route({
+        distanceMeters: 10_000,
+        steps: [step("市街地を経由"), step("中心街を直進")],
+      }),
+      now: DAYTIME,
+    });
+    expect(result.highwayRatio).toBe(0);
   });
 });
 

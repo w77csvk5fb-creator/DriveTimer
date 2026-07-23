@@ -62,11 +62,15 @@ function makeRoute(durationMs: number): RouteDetail {
   return { durationMs, distanceMeters: durationMs * 10, steps: [], overviewPolyline: "" };
 }
 
-function makeStep(instructionText: string, polyline: string): RouteDetail["steps"][number] {
+function makeStep(
+  instructionText: string,
+  polyline: string,
+  distanceMeters = 3_000,
+): RouteDetail["steps"][number] {
   return {
     instructionText,
     durationMs: 5 * 60_000,
-    distanceMeters: 3_000,
+    distanceMeters,
     maneuver: null,
     startLocation: { lat: 0, lng: 0 },
     endLocation: { lat: 0, lng: 0 },
@@ -187,8 +191,18 @@ describe("generateScenicRouteCandidates", () => {
 
   it("adds a no-highway alternative candidate when a route relies heavily on highways", async () => {
     const targetDurationMs = 114 * 60_000;
+    // 案内文の80%(距離ベース)が高速道路区間 → highwayRatio=0.8、閾値(0.15)を大きく超える
+    const highwayHeavyRoute: RouteDetail = {
+      durationMs: targetDurationMs,
+      distanceMeters: 10_000,
+      overviewPolyline: "",
+      steps: [
+        makeStep("東名高速道路を進む", "highway_poly", 8_000),
+        makeStep("一般道を直進", "surface_poly", 2_000),
+      ],
+    };
     const byBearing = new Map<number, RouteDetail>([
-      [0, makeRoute(targetDurationMs)],
+      [0, highwayHeavyRoute],
       [45, makeRoute(targetDurationMs * 3)],
       [90, makeRoute(targetDurationMs * 3)],
       [135, makeRoute(targetDurationMs * 3)],
@@ -197,7 +211,7 @@ describe("generateScenicRouteCandidates", () => {
       [270, makeRoute(targetDurationMs * 3)],
       [315, makeRoute(targetDurationMs * 3)],
     ]);
-    // 高速道路を避けると所要時間が2倍かかる → highwayRatio=(2T-T)/2T=0.5、閾値(0.15)を大きく超える
+    // 高速道路を避けたルート(代替候補の中身として使われる。highwayRatioの算出には使わない)
     const avoidHighwaysByBearing = new Map<number, RouteDetail>([
       [0, makeRoute(targetDurationMs * 2)],
     ]);
@@ -228,8 +242,18 @@ describe("generateScenicRouteCandidates", () => {
 
   it("does not add a no-highway alternative when the route barely uses highways", async () => {
     const targetDurationMs = 114 * 60_000;
+    // 案内文中の高速道路区間は距離ベースでわずか5% → highwayRatioが閾値(0.15)未満
+    const routeWithMinorHighway: RouteDetail = {
+      durationMs: targetDurationMs,
+      distanceMeters: 10_000,
+      overviewPolyline: "",
+      steps: [
+        makeStep("一般道を直進", "surface_poly", 9_500),
+        makeStep("ICから高速道路へ", "highway_poly", 500),
+      ],
+    };
     const byBearing = new Map<number, RouteDetail>([
-      [0, makeRoute(targetDurationMs)],
+      [0, routeWithMinorHighway],
       [45, makeRoute(targetDurationMs * 3)],
       [90, makeRoute(targetDurationMs * 3)],
       [135, makeRoute(targetDurationMs * 3)],
@@ -238,14 +262,9 @@ describe("generateScenicRouteCandidates", () => {
       [270, makeRoute(targetDurationMs * 3)],
       [315, makeRoute(targetDurationMs * 3)],
     ]);
-    // 高速道路を避けても所要時間はほぼ同じ → highwayRatioは閾値未満
-    const avoidHighwaysByBearing = new Map<number, RouteDetail>([
-      [0, makeRoute(targetDurationMs * 1.02)],
-    ]);
     const repo = new FakeDirectionsRepository(
       { durationMs: 30 * 60_000, distanceMeters: 20_000 },
       byBearing,
-      avoidHighwaysByBearing,
     );
 
     const result = await generateScenicRouteCandidates({

@@ -62,7 +62,7 @@ function extractHighwaySegmentPolylines(route: RouteDetail): readonly string[] {
  * 2) 自由時間の一部(TIME_USE_FRACTION)を使って往復可能な半径を見積もる
  * 3) 8方位の候補waypointを生成し、各経由ルートを取得
  * 4) 目標周回時間との適合度でフィルタ（許容誤差を段階的に緩和）
- * 5) 生存候補のみavoidHighways版を追加取得しカテゴリ判定
+ * 5) 生存候補のみavoidHighways版を追加取得(高速道路利用時の代替ルート提案用)しカテゴリ判定
  * 6) waypointが近すぎる候補は重複排除し、スコア降順で上位を返す
  */
 export async function generateScenicRouteCandidates(
@@ -128,13 +128,12 @@ export async function generateScenicRouteCandidates(
     ),
   );
 
-  const candidates: ScenicRouteCandidate[] = survivors.map((s, index) => {
+  const candidates: ScenicRouteCandidate[] = survivors.map((s) => {
     const { category, confidence, highwayRatio, windingRatio } = scoreRouteCategory({
       origin: params.origin,
       waypoint: s.waypoint,
       destination: params.destination,
       normalRoute: s.normalRoute,
-      avoidHighwaysRoute: avoidHighwaysRoutes[index],
       now: params.now,
     });
     const combinedScore =
@@ -179,7 +178,6 @@ export async function generateScenicRouteCandidates(
       waypoint: candidate.waypoint,
       destination: params.destination,
       normalRoute: avoidRoute,
-      avoidHighwaysRoute: null,
       now: params.now,
     });
     const noHighwayFitScore = durationFitScore(avoidRoute.durationMs, targetDurationMs, Infinity);

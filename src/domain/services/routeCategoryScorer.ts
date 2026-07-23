@@ -51,8 +51,6 @@ export interface RouteCategoryScorerInput {
   readonly waypoint: GeoPoint;
   readonly destination: GeoPoint;
   readonly normalRoute: RouteDetail;
-  /** avoidHighways版のルート。取得できなかった場合はnull(highwayRatio=0扱い)。 */
-  readonly avoidHighwaysRoute: RouteDetail | null;
   readonly now: Date;
 }
 
@@ -76,14 +74,18 @@ export function scoreRouteCategory(input: RouteCategoryScorerInput): RouteCatego
       ? clamp(input.normalRoute.distanceMeters / straightLineDistance - 1, 0, 1)
       : 0;
 
-  const highwayRatio = input.avoidHighwaysRoute
-    ? clamp(
-        (input.avoidHighwaysRoute.durationMs - input.normalRoute.durationMs) /
-          input.avoidHighwaysRoute.durationMs,
-        0,
-        1,
-      )
-    : 0;
+  // 高速道路利用比率は、案内文から高速道路区間と判定されたステップの距離が
+  // ルート全体の距離に占める割合として求める。地図プレビューの色分け(extractHighwaySegmentPolylines)
+  // と同じ判定方法(isHighwayInstruction)を使うことで、バッジ表示と地図の色分けが食い違わないようにする。
+  // (以前はavoidHighways版との所要時間差から推定していたが、交通状況次第で実際の高速道路利用と
+  // 乖離することがあった)
+  const highwayDistanceMeters = input.normalRoute.steps
+    .filter((step) => isHighwayInstruction(step.instructionText))
+    .reduce((sum, step) => sum + step.distanceMeters, 0);
+  const highwayRatio =
+    input.normalRoute.distanceMeters > 0
+      ? clamp(highwayDistanceMeters / input.normalRoute.distanceMeters, 0, 1)
+      : 0;
 
   // 暗闇判定が最優先: 夜は海岸/山などの視覚的な違いを判別できないため。
   if (isDarkEnoughForNightView(input.waypoint, input.now)) {
