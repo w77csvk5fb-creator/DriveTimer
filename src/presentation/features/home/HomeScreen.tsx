@@ -107,7 +107,7 @@ export function HomeScreen() {
       <button
         type="button"
         onClick={endDrive}
-        className="btn-danger-gradient h-[68px] rounded-[20px] text-lg font-bold text-on-surface"
+        className="btn-danger-gradient h-[68px] rounded-[20px] text-lg font-bold text-on-accent"
       >
         ドライブ終了
       </button>

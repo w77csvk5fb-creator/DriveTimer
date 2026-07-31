@@ -1,24 +1,30 @@
 @import "tailwindcss";
 
 /*
- * DriveTimer はダークテーマ固定（ライトモード切替なし）。
- * トヨタ/レクサス/ポルシェのナビ画面を意識した、黒基調で運転中でも
- * 一目で見やすい配色トークンをここに集約する。
+ * DriveTimer はライトテーマ固定（ダークモード切替なし）。
+ * アプリアイコン(クリーム色の背景、オレンジ→ピンクの時計リング、深紺の道路、
+ * 青→紫の山並み)の配色を、アプリ全体の見た目に反映した配色トークンをここに集約する。
  */
 :root {
-  --surface-base: #0b0f14;
-  --surface-raised-1: #121821;
-  --surface-raised-2: #202226;
-  --on-surface: #f2f2f0;
-  --on-surface-muted: #9a9ca3;
-  --outline: #2a2c31;
-  --accent-primary: #4c7093;
-  --accent-info: #5c9ead;
-  --accent-caution: #d9c24c;
-  --accent-warning: #e0a733;
-  --accent-urgent: #d8232a;
-  --accent-safe: #4c9a6a;
-  --accent-cyan: #00e5ff;
+  --surface-base: #f5e8d0;
+  --surface-raised-1: #fffaf1;
+  --surface-raised-2: #ecdbbc;
+  --on-surface: #17263f;
+  --on-surface-muted: #59627a;
+  /* 彩度の高いアクセント背景(ボタン等)の上に置く文字色。on-surfaceは背景が明るい前提のため使えない。 */
+  --on-accent: #fdf6ea;
+  --outline: #c2a877;
+  --accent-primary: #2f6a9a;
+  --accent-info: #5c93bd;
+  --accent-caution: #9c7a1a;
+  --accent-warning: #b5591f;
+  --accent-urgent: #c9362f;
+  --accent-safe: #3d7d51;
+  /* アイコンのグロー装飾用。以前はシアンだったが、アイコンの配色に合わせ淡いローズに変更。 */
+  --accent-glow: #d9738c;
+  /* 主要CTAボタン専用の二色グラデーション。アイコンの時計リング(オレンジ→ピンク)をそのまま再現する。 */
+  --accent-cta-start: #f0934a;
+  --accent-cta-end: #e8687f;
 }
 
 @theme inline {
@@ -27,6 +33,7 @@
   --color-surface-raised-2: var(--surface-raised-2);
   --color-on-surface: var(--on-surface);
   --color-on-surface-muted: var(--on-surface-muted);
+  --color-on-accent: var(--on-accent);
   --color-outline: var(--outline);
   --color-accent-primary: var(--accent-primary);
   --color-accent-info: var(--accent-info);
@@ -34,12 +41,12 @@
   --color-accent-warning: var(--accent-warning);
   --color-accent-urgent: var(--accent-urgent);
   --color-accent-safe: var(--accent-safe);
-  --color-accent-cyan: var(--accent-cyan);
+  --color-accent-glow: var(--accent-glow);
   --font-sans: var(--font-noto-sans-jp);
 }
 
 html {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 body {
@@ -47,22 +54,19 @@ body {
   color: var(--on-surface);
 }
 
-/* アイコンに少量のシアングローを添えて高級感を出す(仕様: アクセントカラーはアイコン・グローに少量使用)。 */
+/* アイコンに少量のグローを添えて高級感を出す(仕様: アクセントカラーはアイコン・グローに少量使用)。 */
 .icon-glow {
-  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--accent-cyan) 70%, transparent));
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--accent-glow) 70%, transparent));
 }
 
 /*
  * 画面全体で共通のボタン意匠(グラデーション+ドロップシャドウ)。
  * サイズ・角丸・余白は呼び出し側のTailwindクラスに任せ、色と質感だけをここで統一する。
+ * 主要CTA(出発ボタン等)はアプリアイコンの時計リングと同じオレンジ→ピンクの二色グラデーション。
  */
 .btn-primary-gradient {
-  background: linear-gradient(
-    to bottom,
-    var(--accent-primary),
-    color-mix(in srgb, var(--accent-primary) 65%, black)
-  );
-  box-shadow: 0 8px 20px -8px color-mix(in srgb, var(--accent-primary) 60%, transparent);
+  background: linear-gradient(135deg, var(--accent-cta-start), var(--accent-cta-end));
+  box-shadow: 0 8px 20px -8px color-mix(in srgb, var(--accent-cta-end) 55%, transparent);
 }
 .btn-danger-gradient {
   background: linear-gradient(
