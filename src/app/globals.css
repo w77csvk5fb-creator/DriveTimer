@@ -14,7 +14,9 @@
   /* 彩度の高いアクセント背景(ボタン等)の上に置く文字色。on-surfaceは背景が明るい前提のため使えない。 */
   --on-accent: #fdf6ea;
   --outline: #c2a877;
-  --accent-primary: #2f6a9a;
+  /* 選択状態・リンク色。以前は寒色の紺青で、アイコンの暖色パレットから浮いて見えたため、
+     アイコンの山並み(右側、ピンク→紫の移行部)から採った深いローズに変更。 */
+  --accent-primary: #b8425c;
   --accent-info: #5c93bd;
   --accent-caution: #9c7a1a;
   --accent-warning: #b5591f;
