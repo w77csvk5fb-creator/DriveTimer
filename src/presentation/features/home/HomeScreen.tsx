@@ -29,6 +29,10 @@ export function HomeScreen() {
   const lastNotification = useActiveDriveStore((s) => s.lastNotification);
 
   const isRedTone = driveStatus?.kind === "arrivalGuaranteeFailure";
+  const isTurnBackTiming =
+    driveStatus?.kind === "arrivalGuaranteeFailure" ||
+    (driveStatus?.kind === "onTrack" &&
+      (driveStatus.risk === "warning" || driveStatus.risk === "critical"));
 
   if (phase === "ended" && summary) {
     return (
@@ -99,7 +103,11 @@ export function HomeScreen() {
         currentPosition={currentPosition}
         destination={destination}
         routePolyline={
-          scenicWaypoint ? (displayRoutePolyline ?? undefined) : lastEta?.overviewPolyline
+          scenicWaypoint
+            ? (displayRoutePolyline ?? undefined)
+            : isTurnBackTiming
+              ? lastEta?.overviewPolyline
+              : undefined
         }
         criticalMode={isRedTone}
       />
