@@ -24,6 +24,7 @@ import { endDriveSession } from "@/domain/usecases/endDriveSession";
 import { fetchFastestRoute as fetchFastestRouteUsecase } from "@/domain/usecases/fetchFastestRoute";
 import { evaluateNotificationThresholds } from "@/domain/services/notificationThresholdEvaluator";
 import { computeDriveStatus } from "@/domain/services/turnBackCalculator";
+import { isLikelyOffRoute } from "@/domain/services/offRouteDetector";
 import type { DriveStatusSample } from "@/domain/services/turnBackPointDetector";
 import { haversineDistanceMeters } from "@/core/utils/geoUtils";
 import {
@@ -68,6 +69,8 @@ interface ActiveDriveState {
   readonly scenicWaypoint: GeoPoint | null;
   /** scenicWaypoint経由の表示専用ルート線。安全計算には使わない。取得失敗時はnull。 */
   readonly displayRoutePolyline: string | null;
+  /** true=「今すぐ折り返す」が押された。リスクに関わらずルート線を表示し続ける。 */
+  readonly routeLineForceVisible: boolean;
   readonly summary: DriveSummary | null;
   readonly locationError: LocationError | null;
   readonly wakeLockSupported: boolean;
@@ -84,6 +87,8 @@ interface ActiveDriveState {
   dismissSummary(): void;
   /** 到着保証モード時の「最短ルートへ変更」ボタン */
   fetchFastestRoute(): Promise<void>;
+  /** 「今すぐ折り返す」ボタン。経由地を破棄し目的地への直行(最短)ルートに切り替える。 */
+  turnBackNow(): void;
 }
 
 // ストア外で保持する非リアクティブな内部リソース。レンダリングに関係しないため分離する。
@@ -102,6 +107,14 @@ interface InternalRuntime {
   arrivalGuaranteeModeTriggered: boolean;
   distanceSamples: DriveStatusSample[];
   completing: boolean;
+  /**
+   * 景観ルートの経由地(scenicWaypoint)に一度でも近づいたか。
+   * 経由地へ向かう途中で目的地の近くを通過することがあるため、経由地訪問前は
+   * 目的地への接近だけで「到着」と誤判定しないようにするためのフラグ。
+   */
+  scenicWaypointVisited: boolean;
+  /** オフルート判定(isLikelyOffRoute)用に、位置更新のたびに保持する直前の位置。 */
+  lastKnownPosition: GeoPoint | null;
 }
 
 const wakeLockController = new BrowserWakeLockController();
@@ -130,6 +143,8 @@ const runtime: InternalRuntime = {
   arrivalGuaranteeModeTriggered: false,
   distanceSamples: [],
   completing: false,
+  scenicWaypointVisited: false,
+  lastKnownPosition: null,
 };
 
 function stopTimersAndSubscriptions() {
@@ -161,6 +176,8 @@ function resetSessionRuntime() {
   runtime.arrivalGuaranteeModeTriggered = false;
   runtime.distanceSamples = [];
   runtime.completing = false;
+  runtime.scenicWaypointVisited = false;
+  runtime.lastKnownPosition = null;
 }
 
 /** onTrack/arrivalGuaranteeFailureいずれの新しい状態も、summary用の集計に反映する */
@@ -188,6 +205,7 @@ export const useActiveDriveStore = create<ActiveDriveState>((set, get) => ({
   lastEta: null,
   scenicWaypoint: null,
   displayRoutePolyline: null,
+  routeLineForceVisible: false,
   summary: null,
   locationError: null,
   wakeLockSupported: false,
@@ -215,6 +233,7 @@ export const useActiveDriveStore = create<ActiveDriveState>((set, get) => ({
       lastEta: null,
       scenicWaypoint: params.scenicWaypoint ?? null,
       displayRoutePolyline: null,
+      routeLineForceVisible: false,
       summary: null,
       locationError: null,
       wakeLockSupported: wakeLockController.isSupported,
@@ -347,7 +366,33 @@ export const useActiveDriveStore = create<ActiveDriveState>((set, get) => ({
         }));
 
         const state = get();
-        if (state.destination) {
+
+        // 景観ルートの経由地に向かっている間は、まだ経由地に到達していなくても
+        // ルートの都合で目的地付近を通過することがある。経由地訪問前は目的地への
+        // 接近だけで「到着」と誤判定しないよう、経由地への接近を先に確認しておく。
+        // 「経由地の半径内に入った」か「目的地より経由地の方が近い(まだ往路)」の
+        // いずれかが成り立つ間は経由地未訪問として扱う。後者だけだと厳密な半径に
+        // 入れなかった場合に永久に到着判定できなくなるおそれがあるため、
+        // 「目的地の方が近くなった」時点でも自動的に訪問済み扱いにして復帰できるようにする。
+        if (state.scenicWaypoint && !runtime.scenicWaypointVisited) {
+          const distanceToWaypoint = haversineDistanceMeters(
+            update.position,
+            state.scenicWaypoint,
+          );
+          const distanceToDestinationNow = haversineDistanceMeters(
+            update.position,
+            state.destination ?? state.scenicWaypoint,
+          );
+          if (
+            distanceToWaypoint <= ARRIVAL_DETECTION_RADIUS_METERS ||
+            distanceToDestinationNow < distanceToWaypoint
+          ) {
+            runtime.scenicWaypointVisited = true;
+          }
+        }
+        const awaitingScenicWaypoint = !!state.scenicWaypoint && !runtime.scenicWaypointVisited;
+
+        if (state.destination && !awaitingScenicWaypoint) {
           const distanceToDestination = haversineDistanceMeters(
             update.position,
             state.destination,
@@ -358,7 +403,18 @@ export const useActiveDriveStore = create<ActiveDriveState>((set, get) => ({
           }
         }
 
+        // 案内中のステップの向きと大きくズレた方向へ進んだ場合、通常の間隔を待たず
+        // 即座に再計算する。これをしないと、案内から外れた道に入った後もしばらく
+        // 古いルートの指示(結果的に「戻る」ような指示に見える)が表示され続けてしまう。
+        const offRoute = isLikelyOffRoute(
+          state.lastEta?.steps[0],
+          runtime.lastKnownPosition,
+          update.position,
+        );
+        runtime.lastKnownPosition = update.position;
+
         const shouldRecalc =
+          offRoute ||
           !runtime.lastRecalcPosition ||
           haversineDistanceMeters(runtime.lastRecalcPosition, update.position) >=
             RECALC_DISTANCE_METERS;
@@ -446,6 +502,7 @@ export const useActiveDriveStore = create<ActiveDriveState>((set, get) => ({
       lastEta: null,
       scenicWaypoint: null,
       displayRoutePolyline: null,
+      routeLineForceVisible: false,
       summary: null,
       locationError: null,
       wakeLockSupported: false,
@@ -473,5 +530,21 @@ export const useActiveDriveStore = create<ActiveDriveState>((set, get) => ({
     } finally {
       set({ fastestRouteLoading: false });
     }
+  },
+
+  turnBackNow() {
+    const state = get();
+    if (state.phase !== "active") return;
+
+    // 経由地を破棄して目的地への直行(最短)ルートに切り替える。安全計算は元々常に
+    // 現在地→目的地の直行ETAを使っているため、経由地を消すだけで以降の再計算は
+    // 自動的に最短ルートを返すようになる。
+    set({
+      scenicWaypoint: null,
+      displayRoutePolyline: null,
+      routeLineForceVisible: true,
+    });
+    // 次の位置更新/定期ティックで間を置かず再計算させる
+    runtime.lastRecalcPosition = null;
   },
 }));

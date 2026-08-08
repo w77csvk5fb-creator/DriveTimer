@@ -20,8 +20,10 @@ export function HomeScreen() {
   const lastEta = useActiveDriveStore((s) => s.lastEta);
   const scenicWaypoint = useActiveDriveStore((s) => s.scenicWaypoint);
   const displayRoutePolyline = useActiveDriveStore((s) => s.displayRoutePolyline);
+  const routeLineForceVisible = useActiveDriveStore((s) => s.routeLineForceVisible);
   const summary = useActiveDriveStore((s) => s.summary);
   const endDrive = useActiveDriveStore((s) => s.endDrive);
+  const turnBackNow = useActiveDriveStore((s) => s.turnBackNow);
   const dismissSummary = useActiveDriveStore((s) => s.dismissSummary);
   const locationError = useActiveDriveStore((s) => s.locationError);
   const wakeLockActive = useActiveDriveStore((s) => s.wakeLockActive);
@@ -33,6 +35,8 @@ export function HomeScreen() {
     driveStatus?.kind === "arrivalGuaranteeFailure" ||
     (driveStatus?.kind === "onTrack" &&
       (driveStatus.risk === "warning" || driveStatus.risk === "critical"));
+  // 「今すぐ折り返す」を押した後は、リスクレベルに関わらずルート線を表示し続ける。
+  const shouldShowRouteLine = isTurnBackTiming || routeLineForceVisible;
 
   if (phase === "ended" && summary) {
     return (
@@ -105,12 +109,20 @@ export function HomeScreen() {
         routePolyline={
           scenicWaypoint
             ? (displayRoutePolyline ?? undefined)
-            : isTurnBackTiming
+            : shouldShowRouteLine
               ? lastEta?.overviewPolyline
               : undefined
         }
         criticalMode={isRedTone}
       />
+
+      <button
+        type="button"
+        onClick={turnBackNow}
+        className="btn-primary-gradient h-14 rounded-2xl text-base font-bold text-on-surface"
+      >
+        🔄 今すぐ折り返す
+      </button>
 
       <button
         type="button"
