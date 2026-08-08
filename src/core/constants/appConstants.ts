@@ -6,8 +6,10 @@ export const RECALC_INTERVAL_MS = 20_000;
 /** この距離(m)以上移動したら20秒を待たず再計算する */
 export const RECALC_DISTANCE_METERS = 300;
 
+// カウントダウン表示は分単位でしか変化しないため(formatDurationJa参照)、
+// 1秒間隔での再計算・再描画は無駄が大きく、長時間の運転で端末への負荷になっていた。
 /** カウントダウン表示を更新するUIティッカーの間隔（ミリ秒） */
-export const UI_TICK_INTERVAL_MS = 1_000;
+export const UI_TICK_INTERVAL_MS = 5_000;
 
 /** この距離(m)以内に近づいたら「到着」とみなす */
 export const ARRIVAL_DETECTION_RADIUS_METERS = 100;

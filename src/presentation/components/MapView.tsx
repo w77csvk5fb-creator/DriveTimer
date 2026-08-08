@@ -11,6 +11,9 @@ import { useSettingsStore, type MapThemeMode } from "@/presentation/stores/setti
 const MIN_HEADING_UPDATE_DISTANCE_METERS = 5;
 const FOLLOW_ZOOM = 17;
 const FOLLOW_TILT = 45;
+// panTo/setHeading等のカメラ追従はVector Map上で毎回GPU再描画を伴う重い処理のため、
+// GPS更新のたびに実行すると長時間の運転で端末に大きな負荷をかける。この間隔でのみ実行する。
+const CAMERA_FOLLOW_MIN_INTERVAL_MS = 2_000;
 
 interface MapViewProps {
   readonly currentPosition: GeoPoint | null;
@@ -115,6 +118,7 @@ export function MapView({
   const highwaySegmentPolylinesRef = useRef<google.maps.Polyline[]>([]);
   const lastHeadingPositionRef = useRef<GeoPoint | null>(null);
   const lastHeadingRef = useRef(0);
+  const lastCameraFollowAtRef = useRef(0);
   // 地図オブジェクトの生成は非同期。生成完了前にdestination等が確定済みだと、
   // それらのprop自体は二度と変化せず対応するeffectが再実行されないままになるため、
   // 生成完了を状態(世代カウンタ)として持ち、他の全effectの依存配列に加えて再評価を強制する。
@@ -213,8 +217,12 @@ export function MapView({
       }
       lastHeadingPositionRef.current = currentPosition;
 
-      // カメラの追従(パン・ズーム・傾き・回転)はユーザーが手動操作していない間だけ行う
-      if (following) {
+      // カメラの追従(パン・ズーム・傾き・回転)はユーザーが手動操作していない間だけ行う。
+      // Vector Map上でのpanTo/setTilt/setHeadingはGPU再描画を伴う重い処理なので、
+      // GPS更新のたびに実行せず一定間隔に間引く(端末負荷・バッテリー消費の軽減)。
+      const now = Date.now();
+      if (following && now - lastCameraFollowAtRef.current >= CAMERA_FOLLOW_MIN_INTERVAL_MS) {
+        lastCameraFollowAtRef.current = now;
         isProgrammaticUpdateRef.current = true;
         mapRef.current.panTo(currentPosition);
         mapRef.current.setZoom(FOLLOW_ZOOM);
@@ -446,7 +454,10 @@ export function MapView({
       {!waypoint && !following && (
         <button
           type="button"
-          onClick={() => setFollowing(true)}
+          onClick={() => {
+            lastCameraFollowAtRef.current = 0;
+            setFollowing(true);
+          }}
           className="absolute bottom-3 right-3 rounded-full border border-outline bg-surface-raised-1 px-3 py-2 text-sm font-semibold text-on-surface shadow-lg"
         >
           📍 現在地に戻る
