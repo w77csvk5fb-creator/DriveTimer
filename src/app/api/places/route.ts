@@ -6,6 +6,8 @@ interface PlacesAutocompleteResponse {
     readonly placePrediction?: {
       readonly placeId: string;
       readonly text?: { readonly text: string };
+      /** originを指定した場合のみ返る直線距離(m)。ルート系の予測やごく近距離では省略される。 */
+      readonly distanceMeters?: number;
     };
   }>;
 }
@@ -48,19 +50,16 @@ export async function GET(request: NextRequest) {
 
   const input = request.nextUrl.searchParams.get("input");
   if (input) {
-    // 現在地が分かる場合は近傍を優先(locationBias)して候補を返す。除外はしないため、
-    // 遠方の目的地でも候補には残る。
+    // 現在地が分かる場合は近傍を優先(locationBias)しつつ、origin指定で返る
+    // distanceMeters(現在地からの直線距離)を使って実際に近い順へ並び替える。
+    // locationBiasだけでは関連性スコアへの「優先」に過ぎず、厳密な距離順にはならないため。
     const lat = request.nextUrl.searchParams.get("lat");
     const lng = request.nextUrl.searchParams.get("lng");
-    const locationBias =
-      lat && lng
-        ? {
-            circle: {
-              center: { latitude: Number(lat), longitude: Number(lng) },
-              radius: LOCATION_BIAS_RADIUS_METERS,
-            },
-          }
-        : undefined;
+    const origin =
+      lat && lng ? { latitude: Number(lat), longitude: Number(lng) } : undefined;
+    const locationBias = origin
+      ? { circle: { center: origin, radius: LOCATION_BIAS_RADIUS_METERS } }
+      : undefined;
 
     const response = await fetch("https://places.googleapis.com/v1/places:autocomplete", {
       method: "POST",
@@ -68,13 +67,22 @@ export async function GET(request: NextRequest) {
         "Content-Type": "application/json",
         "X-Goog-Api-Key": apiKey,
       },
-      body: JSON.stringify({ input, languageCode: "ja", regionCode: "JP", locationBias }),
+      body: JSON.stringify({ input, languageCode: "ja", regionCode: "JP", locationBias, origin }),
     });
     if (!response.ok) {
       return NextResponse.json({ error: "places_api_error" }, { status: 502 });
     }
     const data = (await response.json()) as PlacesAutocompleteResponse;
-    return NextResponse.json(data);
+    if (!origin || !data.suggestions) {
+      return NextResponse.json(data);
+    }
+    // distanceMeters未指定(ルート予測、または1m未満)の候補は末尾に回す
+    const sorted = [...data.suggestions].sort((a, b) => {
+      const da = a.placePrediction?.distanceMeters ?? Number.POSITIVE_INFINITY;
+      const db = b.placePrediction?.distanceMeters ?? Number.POSITIVE_INFINITY;
+      return da - db;
+    });
+    return NextResponse.json({ ...data, suggestions: sorted });
   }
 
   return NextResponse.json({ error: "input or placeId is required" }, { status: 400 });
