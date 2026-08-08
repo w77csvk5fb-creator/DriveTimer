@@ -4,6 +4,7 @@ import "./globals.css";
 import { RegisterServiceWorker } from "@/core/pwa/RegisterServiceWorker";
 import { ChunkErrorRecovery } from "@/core/pwa/ChunkErrorRecovery";
 import { FirebaseAuthBootstrap } from "@/presentation/providers/FirebaseAuthBootstrap";
+import { ActiveDriveResumeBootstrap } from "@/presentation/providers/ActiveDriveResumeBootstrap";
 
 const notoSansJP = Noto_Sans_JP({
   variable: "--font-noto-sans-jp",
@@ -48,6 +49,7 @@ export default function RootLayout({
         {children}
         <RegisterServiceWorker />
         <ChunkErrorRecovery />
+        <ActiveDriveResumeBootstrap />
         <FirebaseAuthBootstrap />
       </body>
     </html>

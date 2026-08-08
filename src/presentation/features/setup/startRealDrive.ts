@@ -22,5 +22,6 @@ export function startRealDrive(
     directionsRepository: new RemoteDirectionsRepository(),
     historyRepository: driveHistoryRepository,
     now: () => new Date(),
+    persistable: true,
   });
 }

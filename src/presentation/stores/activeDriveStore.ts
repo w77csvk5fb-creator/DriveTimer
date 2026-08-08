@@ -53,6 +53,64 @@ export interface StartDriveParams {
   readonly historyRepository: DriveHistoryRepository;
   /** 実本番は () => new Date()、シミュレーションはSimClock#nowを渡す */
   readonly now: () => Date;
+  /**
+   * true時、走行開始パラメータをlocalStorageへ保存し、ページの予期しない再読み込み
+   * (バックグラウンド化によるWebView再生成、Service Worker更新時のチャンク読み込み失敗等)後も
+   * resumePersistedDrive()で自動的に走行を再開できるようにする。シミュレーションは
+   * SimClock等を復元できないため対象外(呼び出し側でfalse/未指定のままにする)。
+   */
+  readonly persistable?: boolean;
+  /** 再開時のみ指定。元のセッション開始時刻を引き継ぐ(省略時はnow()を使う=新規開始扱い)。 */
+  readonly resumeSessionStartedAt?: Date;
+}
+
+const PERSISTED_DRIVE_STORAGE_KEY = "drivetime.activeDrive.v1";
+// これ以上前に保存された「進行中ドライブ」は、締切をとうに過ぎ運転自体も
+// 終わっている可能性が高いため復元を試みない。
+const PERSISTED_DRIVE_MAX_AGE_MS = 24 * 60 * 60_000;
+
+interface PersistedDrive {
+  readonly destination: GeoPoint;
+  readonly deadline: string;
+  readonly safetyBufferMinutes: number;
+  readonly scenicWaypoint: GeoPoint | null;
+  readonly notificationLeadTimesMinutes: readonly number[];
+  readonly sessionStartedAt: string;
+  readonly savedAt: string;
+}
+
+function persistDrive(data: PersistedDrive | null): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (data) {
+      window.localStorage.setItem(PERSISTED_DRIVE_STORAGE_KEY, JSON.stringify(data));
+    } else {
+      window.localStorage.removeItem(PERSISTED_DRIVE_STORAGE_KEY);
+    }
+  } catch {
+    // localStorageが使えない環境では復元機能が使えないだけで、通常の走行には影響しない
+  }
+}
+
+/**
+ * 直前に永続化された「進行中だったドライブ」があれば返す(古すぎる場合はnull)。
+ * 実際の再開(位置情報監視やタイマーの再構築)は呼び出し側がstartDriveを呼んで行う。
+ */
+export function loadPersistedDrive(): PersistedDrive | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(PERSISTED_DRIVE_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as PersistedDrive;
+    const savedAt = new Date(parsed.savedAt).getTime();
+    if (!Number.isFinite(savedAt) || Date.now() - savedAt > PERSISTED_DRIVE_MAX_AGE_MS) {
+      persistDrive(null);
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
 }
 
 interface ActiveDriveState {
@@ -161,6 +219,7 @@ function stopTimersAndSubscriptions() {
     runtime.recalcIntervalId = null;
   }
   void wakeLockController.release();
+  persistDrive(null);
 }
 
 function resetSessionRuntime() {
@@ -248,7 +307,21 @@ export const useActiveDriveStore = create<ActiveDriveState>((set, get) => ({
     runtime.nowProvider = params.now;
     runtime.notificationLeadTimesMinutes =
       params.notificationLeadTimesMinutes ?? DEFAULT_NOTIFICATION_LEAD_TIMES_MINUTES;
-    runtime.sessionStartedAt = params.now();
+    runtime.sessionStartedAt = params.resumeSessionStartedAt ?? params.now();
+
+    if (params.persistable) {
+      persistDrive({
+        destination: params.destination,
+        deadline: params.deadline.toISOString(),
+        safetyBufferMinutes: params.safetyBufferMinutes,
+        scenicWaypoint: params.scenicWaypoint ?? null,
+        notificationLeadTimesMinutes: runtime.notificationLeadTimesMinutes,
+        sessionStartedAt: runtime.sessionStartedAt.toISOString(),
+        savedAt: new Date().toISOString(),
+      });
+    } else {
+      persistDrive(null);
+    }
 
     void wakeLockController.request().then((acquired) => {
       set({ wakeLockActive: acquired, wakeLockSupported: wakeLockController.isSupported });
