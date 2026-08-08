@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { GeoPoint } from "@/domain/entities/geoPoint";
+import { getCurrentPositionOnce } from "@/data/datasources/browser/getCurrentPositionOnce";
 
 export interface SelectedDestination {
   readonly name: string;
@@ -46,6 +47,22 @@ export function DestinationSearchField({
   // 選択確定によりqueryを表示名へ書き換えた際、それを新規検索としては扱わないための目印
   const [lastSelectedName, setLastSelectedName] = useState<string | undefined>(undefined);
   const [syncedName, setSyncedName] = useState(selectedDestinationName);
+  // 候補を現在地に近い順で優先表示するためのバイアスに使う。取得できなくても検索自体は続行する。
+  const currentPositionRef = useRef<GeoPoint | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void getCurrentPositionOnce()
+      .then((position) => {
+        if (!cancelled) currentPositionRef.current = position;
+      })
+      .catch(() => {
+        // 位置情報が取れなくても検索自体は続行する(バイアス無しの通常検索にフォールバック)
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   if (selectedDestinationName !== syncedName) {
     setSyncedName(selectedDestinationName);
@@ -71,7 +88,9 @@ export function DestinationSearchField({
       void (async () => {
         setLoading(true);
         try {
-          const res = await fetch(`/api/places?input=${encodeURIComponent(query)}`);
+          const position = currentPositionRef.current;
+          const bias = position ? `&lat=${position.lat}&lng=${position.lng}` : "";
+          const res = await fetch(`/api/places?input=${encodeURIComponent(query)}${bias}`);
           if (res.status === 501) {
             setNotConfigured(true);
             setSuggestions([]);

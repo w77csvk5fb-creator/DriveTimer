@@ -58,4 +58,32 @@ describe("GET /api/places", () => {
     const response = await callRoute("http://localhost:3000/api/places?input=tokyo");
     expect(response.status).toBe(502);
   });
+
+  it("includes a locationBias circle around the current position when lat/lng are given", async () => {
+    process.env.GOOGLE_PLACES_API_KEY = "real-key";
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ suggestions: [] }), { status: 200 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await callRoute("http://localhost:3000/api/places?input=tokyo&lat=35.68&lng=139.76");
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.locationBias).toEqual({
+      circle: { center: { latitude: 35.68, longitude: 139.76 }, radius: 50_000 },
+    });
+  });
+
+  it("omits locationBias when lat/lng are not given", async () => {
+    process.env.GOOGLE_PLACES_API_KEY = "real-key";
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ suggestions: [] }), { status: 200 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await callRoute("http://localhost:3000/api/places?input=tokyo");
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.locationBias).toBeUndefined();
+  });
 });

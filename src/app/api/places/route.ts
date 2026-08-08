@@ -15,6 +15,9 @@ const NOT_CONFIGURED_RESPONSE = {
   message: "GOOGLE_PLACES_API_KEYが設定されていません。SETUP.mdを参照してください。",
 } as const;
 
+/** locationBiasの半径(m)。Places API (New) の circle.radius 上限は50,000m。 */
+const LOCATION_BIAS_RADIUS_METERS = 50_000;
+
 /**
  * Google Places API (New) へのサーバー側プロキシ。
  * ?input=... で候補検索(Autocomplete)、?placeId=... で詳細(座標)取得を行う。
@@ -45,13 +48,27 @@ export async function GET(request: NextRequest) {
 
   const input = request.nextUrl.searchParams.get("input");
   if (input) {
+    // 現在地が分かる場合は近傍を優先(locationBias)して候補を返す。除外はしないため、
+    // 遠方の目的地でも候補には残る。
+    const lat = request.nextUrl.searchParams.get("lat");
+    const lng = request.nextUrl.searchParams.get("lng");
+    const locationBias =
+      lat && lng
+        ? {
+            circle: {
+              center: { latitude: Number(lat), longitude: Number(lng) },
+              radius: LOCATION_BIAS_RADIUS_METERS,
+            },
+          }
+        : undefined;
+
     const response = await fetch("https://places.googleapis.com/v1/places:autocomplete", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "X-Goog-Api-Key": apiKey,
       },
-      body: JSON.stringify({ input, languageCode: "ja", regionCode: "JP" }),
+      body: JSON.stringify({ input, languageCode: "ja", regionCode: "JP", locationBias }),
     });
     if (!response.ok) {
       return NextResponse.json({ error: "places_api_error" }, { status: 502 });
