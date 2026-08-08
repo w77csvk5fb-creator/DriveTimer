@@ -15,7 +15,7 @@ export const UI_TICK_INTERVAL_MS = 5_000;
 export const ARRIVAL_DETECTION_RADIUS_METERS = 100;
 
 /** 安全バッファの選択肢（分） */
-export const SAFETY_BUFFER_OPTIONS_MINUTES = [5, 10, 15, 20, 30] as const;
+export const SAFETY_BUFFER_OPTIONS_MINUTES = [0, 5, 10, 15, 20, 30] as const;
 
 /** 安全バッファの既定値（分） */
 export const DEFAULT_SAFETY_BUFFER_MINUTES = 10;
