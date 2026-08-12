@@ -9,8 +9,9 @@ import { AdviceList } from "@/presentation/components/AdviceList";
 import { WakeLockWarningBanner } from "@/presentation/components/WakeLockWarningBanner";
 import { LocationErrorBanner } from "@/presentation/components/LocationErrorBanner";
 import { NotificationToast } from "@/presentation/components/NotificationToast";
-import { FastestRouteButton } from "@/presentation/components/FastestRouteButton";
 import { TurnByTurnBanner } from "@/presentation/components/TurnByTurnBanner";
+import { buildGoogleMapsDirectionsUrl } from "@/core/utils/googleMapsLink";
+import { formatDurationJa } from "@/core/utils/durationFormatter";
 
 export function HomeScreen() {
   const phase = useActiveDriveStore((s) => s.phase);
@@ -29,6 +30,8 @@ export function HomeScreen() {
   const wakeLockActive = useActiveDriveStore((s) => s.wakeLockActive);
   const directionsError = useActiveDriveStore((s) => s.directionsError);
   const lastNotification = useActiveDriveStore((s) => s.lastNotification);
+  const fastestRoute = useActiveDriveStore((s) => s.fastestRoute);
+  const fastestRouteLoading = useActiveDriveStore((s) => s.fastestRouteLoading);
 
   const isRedTone = driveStatus?.kind === "arrivalGuaranteeFailure";
   const isTurnBackTiming =
@@ -37,6 +40,11 @@ export function HomeScreen() {
       (driveStatus.risk === "warning" || driveStatus.risk === "critical"));
   // 「今すぐ折り返す」を押した後は、リスクレベルに関わらずルート線を表示し続ける。
   const shouldShowRouteLine = isTurnBackTiming || routeLineForceVisible;
+
+  const mapsUrl =
+    currentPosition && destination
+      ? buildGoogleMapsDirectionsUrl(currentPosition, destination)
+      : null;
 
   if (phase === "ended" && summary) {
     return (
@@ -81,28 +89,7 @@ export function HomeScreen() {
   }
 
   return (
-    <main
-      className={`flex flex-1 flex-col gap-4 p-4 transition-colors ${
-        isRedTone ? "bg-accent-urgent/15" : ""
-      }`}
-    >
-      {!wakeLockActive && <WakeLockWarningBanner />}
-      {locationError && <LocationErrorBanner error={locationError} />}
-      {directionsError && (
-        <p className="text-center text-xs text-on-surface-muted">
-          渋滞情報の取得に失敗しました。前回の情報を表示しています。
-        </p>
-      )}
-
-      {driveStatus?.kind === "onTrack" && <RiskBanner status={driveStatus} />}
-      {driveStatus?.kind === "arrivalGuaranteeFailure" && <FastestRouteButton />}
-      {!driveStatus && !locationError && (
-        <p className="text-center text-sm text-on-surface-muted">現在地を取得しています…</p>
-      )}
-
-      {lastNotification && <NotificationToast event={lastNotification} />}
-      {lastEta && lastEta.steps.length > 0 && <TurnByTurnBanner step={lastEta.steps[0]} />}
-
+    <main className="relative flex flex-1 flex-col">
       <MapView
         currentPosition={currentPosition}
         destination={destination}
@@ -114,23 +101,72 @@ export function HomeScreen() {
               : undefined
         }
         criticalMode={isRedTone}
+        fullBleed
       />
 
-      <button
-        type="button"
-        onClick={turnBackNow}
-        className="btn-primary-gradient h-14 rounded-2xl text-base font-bold text-on-surface"
-      >
-        🔄 今すぐ折り返す
-      </button>
+      {/* 地図上部: 状態バナー類を半透明オーバーレイとして重ねる。左上のテーマ切替ピルと
+          被らないよう、その高さ分だけ空けて開始する。 */}
+      <div className="pointer-events-none absolute inset-x-3 top-16 z-10 flex flex-col gap-2">
+        {!wakeLockActive && <WakeLockWarningBanner />}
+        {locationError && <LocationErrorBanner error={locationError} />}
+        {directionsError && (
+          <p className="rounded-xl bg-surface-raised-1/90 px-3 py-2 text-center text-xs text-on-surface-muted shadow-lg">
+            渋滞情報の取得に失敗しました。前回の情報を表示しています。
+          </p>
+        )}
 
-      <button
-        type="button"
-        onClick={endDrive}
-        className="btn-danger-gradient h-[68px] rounded-[20px] text-lg font-bold text-on-accent"
-      >
-        ドライブ終了
-      </button>
+        {driveStatus?.kind === "onTrack" && <RiskBanner status={driveStatus} />}
+        {driveStatus?.kind === "arrivalGuaranteeFailure" && (
+          <p className="rounded-xl bg-accent-urgent/90 px-3 py-2 text-center text-sm font-bold text-on-accent shadow-lg">
+            🔴 締切に約{formatDurationJa(driveStatus.delayMs)}遅れる見込みです
+          </p>
+        )}
+        {!driveStatus && !locationError && (
+          <p className="rounded-xl bg-surface-raised-1/90 px-3 py-2 text-center text-sm text-on-surface-muted shadow-lg">
+            現在地を取得しています…
+          </p>
+        )}
+
+        {lastNotification && <NotificationToast event={lastNotification} />}
+        {lastEta && lastEta.steps.length > 0 && <TurnByTurnBanner step={lastEta.steps[0]} />}
+      </div>
+
+      {/* 地図下部: 小さめの操作ボタンを重ねる。右下の現在地に戻るボタンと被らないよう
+          少し上に余白を持たせている。 */}
+      <div className="pointer-events-none absolute inset-x-3 bottom-4 z-10 flex flex-col items-center gap-2">
+        {fastestRoute && (
+          <p className="pointer-events-auto rounded-full bg-surface-raised-1/90 px-3 py-1.5 text-center text-xs text-on-surface-muted shadow-lg">
+            最短ルートで約{formatDurationJa(fastestRoute.durationMs)}
+            {mapsUrl && (
+              <a
+                href={mapsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ml-2 text-accent-primary underline"
+              >
+                Google Mapsで開く
+              </a>
+            )}
+          </p>
+        )}
+        <div className="pointer-events-auto flex gap-3">
+          <button
+            type="button"
+            onClick={turnBackNow}
+            disabled={fastestRouteLoading}
+            className="btn-primary-gradient rounded-full px-5 py-3 text-sm font-bold text-on-surface shadow-lg disabled:opacity-60"
+          >
+            🔄 {fastestRouteLoading ? "検索中…" : "今すぐ折り返す"}
+          </button>
+          <button
+            type="button"
+            onClick={endDrive}
+            className="btn-danger-gradient rounded-full px-5 py-3 text-sm font-bold text-on-accent shadow-lg"
+          >
+            ⏹ ドライブ終了
+          </button>
+        </div>
+      </div>
     </main>
   );
 }

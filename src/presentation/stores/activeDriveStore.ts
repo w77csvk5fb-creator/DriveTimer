@@ -619,5 +619,8 @@ export const useActiveDriveStore = create<ActiveDriveState>((set, get) => ({
     });
     // 次の位置更新/定期ティックで間を置かず再計算させる
     runtime.lastRecalcPosition = null;
+    // 到着保証モード時に別途あった「最短ルートへ変更」ボタンと機能が重複していたため統合。
+    // 所要時間とGoogle Mapsへの外部リンクも合わせて表示できるよう、ここで取得しておく。
+    void get().fetchFastestRoute();
   },
 }));

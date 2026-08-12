@@ -26,6 +26,8 @@ interface MapViewProps {
   readonly highwaySegmentPolylines?: readonly string[];
   /** 到着保証モード等、緊急度の高い状態であることを示す。枠を強調し最低高さを確保する。 */
   readonly criticalMode?: boolean;
+  /** true時、角丸・枠線を無くし画面いっぱいに敷き詰める(走行中のホーム画面用)。 */
+  readonly fullBleed?: boolean;
 }
 
 // トヨタ/レクサス的な黒基調ナビ画面に寄せたダークスタイル。
@@ -103,6 +105,7 @@ export function MapView({
   routePolyline,
   highwaySegmentPolylines,
   criticalMode = false,
+  fullBleed = false,
 }: MapViewProps) {
   const mapTheme = useSettingsStore((s) => s.mapTheme);
   const setMapTheme = useSettingsStore((s) => s.setMapTheme);
@@ -462,14 +465,16 @@ export function MapView({
 
   return (
     <div
-      className={`relative flex flex-1 ${criticalMode ? "min-h-[280px]" : ""}`}
+      className={`relative flex flex-1 ${criticalMode && !fullBleed ? "min-h-[280px]" : ""}`}
     >
       <div
         ref={containerRef}
-        className={`flex-1 rounded-2xl border-2 bg-surface-raised-1 ${
+        className={`flex-1 bg-surface-raised-1 ${fullBleed ? "" : "rounded-2xl border-2"} ${
           criticalMode
-            ? "border-accent-urgent shadow-lg shadow-accent-urgent/30"
-            : "border-outline"
+            ? `border-accent-urgent shadow-lg shadow-accent-urgent/30 ${fullBleed ? "border-4" : ""}`
+            : fullBleed
+              ? ""
+              : "border-outline"
         }`}
       />
       <div className="absolute left-3 top-3 flex gap-1 rounded-full border border-outline bg-surface-raised-1/90 p-1 shadow-lg">
