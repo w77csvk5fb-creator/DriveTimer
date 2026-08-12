@@ -119,6 +119,7 @@ export function MapView({
   const lastHeadingPositionRef = useRef<GeoPoint | null>(null);
   const lastHeadingRef = useRef(0);
   const lastCameraFollowAtRef = useRef(0);
+  const contextLossCleanupRef = useRef<(() => void) | null>(null);
   // 地図オブジェクトの生成は非同期。生成完了前にdestination等が確定済みだと、
   // それらのprop自体は二度と変化せず対応するeffectが再実行されないままになるため、
   // 生成完了を状態(世代カウンタ)として持ち、他の全effectの依存配列に加えて再評価を強制する。
@@ -129,6 +130,9 @@ export function MapView({
   // 自分自身のpanTo/setZoom呼び出しをユーザー操作と誤検知しないためのフラグ。
   const isProgrammaticUpdateRef = useRef(false);
   const [following, setFollowing] = useState(true);
+  // WebGLコンテキストロスト(ピンチズーム等の高負荷操作でモバイル端末のGPUメモリが
+  // 逼迫した際に起こりうる)を検知した時、地図を作り直すために増やすトークン。
+  const [rebuildToken, setRebuildToken] = useState(0);
 
   const resolvedColorScheme = resolveColorScheme(mapTheme);
 
@@ -183,16 +187,48 @@ export function MapView({
       mapRef.current.addListener("zoom_changed", () => {
         if (!isProgrammaticUpdateRef.current) setFollowing(false);
       });
+
+      // ピンチズーム等の高負荷操作でモバイル端末のGPUメモリが逼迫すると、Vector Map
+      // (WebGL描画)のコンテキストが失われ、以降その地図は完全に描画不能になることがある。
+      // これを検知したら地図全体を作り直す(何もしないと真っ白のまま操作不能になりうる)。
+      // canvasはGoogle Maps内部で非同期に生成されるため、MutationObserverで検出する。
+      const container = containerRef.current;
+      const observedCanvases = new Set<HTMLCanvasElement>();
+      const handleContextLost = (event: Event) => {
+        event.preventDefault(); // ブラウザ自身によるコンテキスト自動復元を試みさせる
+        console.error("MapView: WebGL context lost. Rebuilding the map.");
+        setRebuildToken((t) => t + 1);
+      };
+      const attachToNewCanvases = () => {
+        container.querySelectorAll("canvas").forEach((canvas) => {
+          if (observedCanvases.has(canvas)) return;
+          observedCanvases.add(canvas);
+          canvas.addEventListener("webglcontextlost", handleContextLost);
+        });
+      };
+      attachToNewCanvases();
+      const canvasObserver = new MutationObserver(attachToNewCanvases);
+      canvasObserver.observe(container, { childList: true, subtree: true });
+      contextLossCleanupRef.current = () => {
+        canvasObserver.disconnect();
+        observedCanvases.forEach((canvas) =>
+          canvas.removeEventListener("webglcontextlost", handleContextLost),
+        );
+      };
+
       setFollowing(true);
       setMapGeneration((g) => g + 1);
     });
 
     return () => {
       cancelled = true;
+      contextLossCleanupRef.current?.();
+      contextLossCleanupRef.current = null;
     };
-    // 初回マウント時、およびcolorSchemeの切り替えが必要な時(ダーク⇔ライトなど)にのみ地図を作り直す。
+    // 初回マウント時、colorSchemeの切り替えが必要な時(ダーク⇔ライトなど)、および
+    // WebGLコンテキストロスト検知時(rebuildToken)にのみ地図を作り直す。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resolvedColorScheme]);
+  }, [resolvedColorScheme, rebuildToken]);
 
   // テーマ切り替え(ユーザー操作による設定変更)を既存の地図インスタンスへ反映する
   // (mapTypeId切り替え、および非Vector Map時のJSONスタイル切り替え。colorSchemeは対象外)。
