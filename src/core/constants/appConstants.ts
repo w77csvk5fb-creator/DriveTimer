@@ -14,6 +14,12 @@ export const UI_TICK_INTERVAL_MS = 5_000;
 /** この距離(m)以内に近づいたら「到着」とみなす */
 export const ARRIVAL_DETECTION_RADIUS_METERS = 100;
 
+/**
+ * 景観ルートの経由地に一度近づいた後、この距離(m)以上再び離れたら「経由地を通過した」
+ * とみなす。GPSノイズや経由地周辺での自然な距離の揺れ戻りを誤検知しないための余裕。
+ */
+export const SCENIC_WAYPOINT_DEPARTURE_MARGIN_METERS = 300;
+
 /** 安全バッファの選択肢（分） */
 export const SAFETY_BUFFER_OPTIONS_MINUTES = [0, 5, 10, 15, 20, 30] as const;
 

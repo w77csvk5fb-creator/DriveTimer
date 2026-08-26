@@ -32,6 +32,7 @@ import {
   RECALC_DISTANCE_METERS,
   UI_TICK_INTERVAL_MS,
   ARRIVAL_DETECTION_RADIUS_METERS,
+  SCENIC_WAYPOINT_DEPARTURE_MARGIN_METERS,
   DEFAULT_NOTIFICATION_LEAD_TIMES_MINUTES,
 } from "@/core/constants/appConstants";
 
@@ -127,6 +128,11 @@ interface ActiveDriveState {
   readonly scenicWaypoint: GeoPoint | null;
   /** true=景観ルートの経由地に到達済み(以降は地図の目的地ピン・ルート線を通常表示に戻す)。 */
   readonly scenicWaypointVisited: boolean;
+  /**
+   * true=一度でも到着保証モード(締切に間に合わない)に入った。以降、渋滞解消等で
+   * onTrackに戻っても、地図の目的地ピン・ルート線は景観ルート表示に戻さず直行のままにする。
+   */
+  readonly arrivalGuaranteeModeTriggered: boolean;
   /** scenicWaypoint経由の表示専用ルート線。安全計算には使わない。取得失敗時はnull。 */
   readonly displayRoutePolyline: string | null;
   /** true=「今すぐ折り返す」が押された。リスクに関わらずルート線を表示し続ける。 */
@@ -173,6 +179,13 @@ interface InternalRuntime {
    * 目的地への接近だけで「到着」と誤判定しないようにするためのフラグ。
    */
   scenicWaypointVisited: boolean;
+  /**
+   * 経由地への観測最短距離(m)。開始直後は目的地の方が経由地より近いことが普通にあり得る
+   * (景観ルートは直行より遠回りするため)ため、単純な距離の大小比較では即座に
+   * 訪問済み扱いになってしまう。実際に経由地へ近づいてから一定以上離れたことを検知する
+   * ための基準値として使う。
+   */
+  minDistanceToWaypointMeters: number | null;
   /** オフルート判定(isLikelyOffRoute)用に、位置更新のたびに保持する直前の位置。 */
   lastKnownPosition: GeoPoint | null;
 }
@@ -204,6 +217,7 @@ const runtime: InternalRuntime = {
   distanceSamples: [],
   completing: false,
   scenicWaypointVisited: false,
+  minDistanceToWaypointMeters: null,
   lastKnownPosition: null,
 };
 
@@ -238,6 +252,7 @@ function resetSessionRuntime() {
   runtime.distanceSamples = [];
   runtime.completing = false;
   runtime.scenicWaypointVisited = false;
+  runtime.minDistanceToWaypointMeters = null;
   runtime.lastKnownPosition = null;
 }
 
@@ -266,6 +281,7 @@ export const useActiveDriveStore = create<ActiveDriveState>((set, get) => ({
   lastEta: null,
   scenicWaypoint: null,
   scenicWaypointVisited: false,
+  arrivalGuaranteeModeTriggered: false,
   displayRoutePolyline: null,
   routeLineForceVisible: false,
   summary: null,
@@ -295,6 +311,7 @@ export const useActiveDriveStore = create<ActiveDriveState>((set, get) => ({
       lastEta: null,
       scenicWaypoint: params.scenicWaypoint ?? null,
       scenicWaypointVisited: false,
+      arrivalGuaranteeModeTriggered: false,
       displayRoutePolyline: null,
       routeLineForceVisible: false,
       summary: null,
@@ -380,6 +397,7 @@ export const useActiveDriveStore = create<ActiveDriveState>((set, get) => ({
         lastEta: eta,
         firedNotificationIds: firedIds,
         lastNotification: newlyFired[0] ?? get().lastNotification,
+        arrivalGuaranteeModeTriggered: runtime.arrivalGuaranteeModeTriggered,
       });
 
       // 表示専用: 選んだ景観ルートの経由地がある間は、その経路のポリラインも取得する。
@@ -447,23 +465,25 @@ export const useActiveDriveStore = create<ActiveDriveState>((set, get) => ({
         // 景観ルートの経由地に向かっている間は、まだ経由地に到達していなくても
         // ルートの都合で目的地付近を通過することがある。経由地訪問前は目的地への
         // 接近だけで「到着」と誤判定しないよう、経由地への接近を先に確認しておく。
-        // 「経由地の半径内に入った」か「目的地より経由地の方が近い(まだ往路)」の
-        // いずれかが成り立つ間は経由地未訪問として扱う。後者だけだと厳密な半径に
-        // 入れなかった場合に永久に到着判定できなくなるおそれがあるため、
-        // 「目的地の方が近くなった」時点でも自動的に訪問済み扱いにして復帰できるようにする。
+        // 景観ルートは直行より遠回りするため、出発直後は目的地の方が経由地より
+        // 近いことが普通にある。単純な距離の大小比較だと開始直後に即座に訪問済み
+        // 扱いになってしまうため、「経由地の半径内に入った」か「一度経由地へ最も
+        // 近づいてから、そこから一定距離以上再び離れた(=通過した)」のいずれかで判定する。
         if (state.scenicWaypoint && !runtime.scenicWaypointVisited) {
           const distanceToWaypoint = haversineDistanceMeters(
             update.position,
             state.scenicWaypoint,
           );
-          const distanceToDestinationNow = haversineDistanceMeters(
-            update.position,
-            state.destination ?? state.scenicWaypoint,
-          );
           if (
-            distanceToWaypoint <= ARRIVAL_DETECTION_RADIUS_METERS ||
-            distanceToDestinationNow < distanceToWaypoint
+            runtime.minDistanceToWaypointMeters === null ||
+            distanceToWaypoint < runtime.minDistanceToWaypointMeters
           ) {
+            runtime.minDistanceToWaypointMeters = distanceToWaypoint;
+          }
+          const departedAfterApproach =
+            distanceToWaypoint >
+            runtime.minDistanceToWaypointMeters + SCENIC_WAYPOINT_DEPARTURE_MARGIN_METERS;
+          if (distanceToWaypoint <= ARRIVAL_DETECTION_RADIUS_METERS || departedAfterApproach) {
             runtime.scenicWaypointVisited = true;
             set({ scenicWaypointVisited: true });
           }
@@ -525,7 +545,10 @@ export const useActiveDriveStore = create<ActiveDriveState>((set, get) => ({
         safetyBufferMinutes: state.safetyBufferMinutes ?? 0,
       });
       applyStatusToRuntime(status);
-      set({ driveStatus: status });
+      set({
+        driveStatus: status,
+        arrivalGuaranteeModeTriggered: runtime.arrivalGuaranteeModeTriggered,
+      });
     }, UI_TICK_INTERVAL_MS);
   },
 
@@ -580,6 +603,7 @@ export const useActiveDriveStore = create<ActiveDriveState>((set, get) => ({
       lastEta: null,
       scenicWaypoint: null,
       scenicWaypointVisited: false,
+      arrivalGuaranteeModeTriggered: false,
       displayRoutePolyline: null,
       routeLineForceVisible: false,
       summary: null,

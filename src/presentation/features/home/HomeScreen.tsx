@@ -21,6 +21,7 @@ export function HomeScreen() {
   const lastEta = useActiveDriveStore((s) => s.lastEta);
   const scenicWaypoint = useActiveDriveStore((s) => s.scenicWaypoint);
   const scenicWaypointVisited = useActiveDriveStore((s) => s.scenicWaypointVisited);
+  const arrivalGuaranteeModeTriggered = useActiveDriveStore((s) => s.arrivalGuaranteeModeTriggered);
   const displayRoutePolyline = useActiveDriveStore((s) => s.displayRoutePolyline);
   const routeLineForceVisible = useActiveDriveStore((s) => s.routeLineForceVisible);
   const summary = useActiveDriveStore((s) => s.summary);
@@ -48,8 +49,10 @@ export function HomeScreen() {
       : null;
 
   // 景観ルートの経由地に未到達の間は、地図の目的地ピン・ルート線を経由地基準で見せる。
-  // 到達後は通常通り本来の目的地基準に切り替わる。
-  const awaitingScenicWaypoint = !!scenicWaypoint && !scenicWaypointVisited;
+  // 到達後、または一度でも到着保証モード(締切に間に合わない)に入った後は、景観ルートを
+  // 続けている場合ではないため、渋滞解消等で回復しても本来の目的地基準のまま維持する。
+  const awaitingScenicWaypoint =
+    !!scenicWaypoint && !scenicWaypointVisited && !arrivalGuaranteeModeTriggered;
   const mapDestination = awaitingScenicWaypoint ? scenicWaypoint : destination;
 
   if (phase === "ended" && summary) {
