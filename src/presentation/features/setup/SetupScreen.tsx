@@ -56,8 +56,9 @@ export function SetupScreen() {
   const [scenicError, setScenicError] = useState<string | null>(null);
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
   const [scenicOrigin, setScenicOrigin] = useState<GeoPoint | null>(null);
+  const [starting, setStarting] = useState(false);
 
-  const handleStart = () => {
+  const handleStart = async () => {
     setError(null);
 
     if (!destination) {
@@ -67,7 +68,13 @@ export function SetupScreen() {
     const deadline = parseDeadline(deadlineValue);
 
     if (simulationMode) {
-      startSimulatedDrive(scenarioId, speed, safetyBufferMinutes, destination.point, deadline);
+      // 実ルート取得(現在地取得+Directions API)を待つ間、二重送信を防ぐ
+      setStarting(true);
+      try {
+        await startSimulatedDrive(scenarioId, speed, safetyBufferMinutes, destination.point, deadline);
+      } finally {
+        setStarting(false);
+      }
       router.push("/");
       return;
     }
@@ -230,10 +237,11 @@ export function SetupScreen() {
 
       <button
         type="button"
-        onClick={handleStart}
-        className="btn-primary-gradient h-14 rounded-2xl text-base font-bold text-on-surface"
+        onClick={() => void handleStart()}
+        disabled={starting}
+        className="btn-primary-gradient h-14 rounded-2xl text-base font-bold text-on-surface disabled:opacity-60"
       >
-        出発
+        {starting ? "ルートを確認中…" : "出発"}
       </button>
     </main>
   );

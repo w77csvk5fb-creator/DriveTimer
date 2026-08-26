@@ -58,3 +58,45 @@ export function destinationPoint(
 
   return { lat: toDeg(lat2), lng: toDeg(lng2) };
 }
+
+/** パス(道路に沿った座標列)の全長(m)を各セグメントのHaversine距離の合計で求める */
+export function pathLengthMeters(path: readonly GeoPoint[]): number {
+  let total = 0;
+  for (let i = 1; i < path.length; i++) {
+    total += haversineDistanceMeters(path[i - 1], path[i]);
+  }
+  return total;
+}
+
+/**
+ * パス(道路に沿った座標列)の終点から指定距離(m)だけ手前の地点を、該当セグメント内の
+ * 線形補間で求める。距離が0以下ならパスの終点、全長以上ならパスの始点を返す(クランプ)。
+ * シミュレーションモードで「目的地までの残り距離」を実ルート上の位置に変換するために使う。
+ */
+export function pointAtDistanceFromEnd(
+  path: readonly GeoPoint[],
+  distanceFromEndMeters: number,
+): GeoPoint {
+  if (path.length === 0) {
+    throw new Error("path must not be empty");
+  }
+  if (path.length === 1 || distanceFromEndMeters <= 0) {
+    return path[path.length - 1];
+  }
+
+  let remaining = distanceFromEndMeters;
+  for (let i = path.length - 1; i > 0; i--) {
+    const segmentStart = path[i - 1];
+    const segmentEnd = path[i];
+    const segmentLength = haversineDistanceMeters(segmentStart, segmentEnd);
+    if (remaining <= segmentLength) {
+      const t = segmentLength === 0 ? 0 : remaining / segmentLength;
+      return {
+        lat: segmentEnd.lat + (segmentStart.lat - segmentEnd.lat) * t,
+        lng: segmentEnd.lng + (segmentStart.lng - segmentEnd.lng) * t,
+      };
+    }
+    remaining -= segmentLength;
+  }
+  return path[0];
+}
