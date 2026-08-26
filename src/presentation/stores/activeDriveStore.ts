@@ -125,6 +125,8 @@ interface ActiveDriveState {
   readonly lastNotification: NotificationEvent | null;
   readonly lastEta: RouteDetail | null;
   readonly scenicWaypoint: GeoPoint | null;
+  /** true=景観ルートの経由地に到達済み(以降は地図の目的地ピン・ルート線を通常表示に戻す)。 */
+  readonly scenicWaypointVisited: boolean;
   /** scenicWaypoint経由の表示専用ルート線。安全計算には使わない。取得失敗時はnull。 */
   readonly displayRoutePolyline: string | null;
   /** true=「今すぐ折り返す」が押された。リスクに関わらずルート線を表示し続ける。 */
@@ -263,6 +265,7 @@ export const useActiveDriveStore = create<ActiveDriveState>((set, get) => ({
   lastNotification: null,
   lastEta: null,
   scenicWaypoint: null,
+  scenicWaypointVisited: false,
   displayRoutePolyline: null,
   routeLineForceVisible: false,
   summary: null,
@@ -291,6 +294,7 @@ export const useActiveDriveStore = create<ActiveDriveState>((set, get) => ({
       lastNotification: null,
       lastEta: null,
       scenicWaypoint: params.scenicWaypoint ?? null,
+      scenicWaypointVisited: false,
       displayRoutePolyline: null,
       routeLineForceVisible: false,
       summary: null,
@@ -461,6 +465,7 @@ export const useActiveDriveStore = create<ActiveDriveState>((set, get) => ({
             distanceToDestinationNow < distanceToWaypoint
           ) {
             runtime.scenicWaypointVisited = true;
+            set({ scenicWaypointVisited: true });
           }
         }
         const awaitingScenicWaypoint = !!state.scenicWaypoint && !runtime.scenicWaypointVisited;
@@ -574,6 +579,7 @@ export const useActiveDriveStore = create<ActiveDriveState>((set, get) => ({
       lastNotification: null,
       lastEta: null,
       scenicWaypoint: null,
+      scenicWaypointVisited: false,
       displayRoutePolyline: null,
       routeLineForceVisible: false,
       summary: null,
@@ -614,6 +620,7 @@ export const useActiveDriveStore = create<ActiveDriveState>((set, get) => ({
     // 自動的に最短ルートを返すようになる。
     set({
       scenicWaypoint: null,
+      scenicWaypointVisited: false,
       displayRoutePolyline: null,
       routeLineForceVisible: true,
     });

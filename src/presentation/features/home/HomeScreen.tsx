@@ -20,6 +20,7 @@ export function HomeScreen() {
   const destination = useActiveDriveStore((s) => s.destination);
   const lastEta = useActiveDriveStore((s) => s.lastEta);
   const scenicWaypoint = useActiveDriveStore((s) => s.scenicWaypoint);
+  const scenicWaypointVisited = useActiveDriveStore((s) => s.scenicWaypointVisited);
   const displayRoutePolyline = useActiveDriveStore((s) => s.displayRoutePolyline);
   const routeLineForceVisible = useActiveDriveStore((s) => s.routeLineForceVisible);
   const summary = useActiveDriveStore((s) => s.summary);
@@ -45,6 +46,11 @@ export function HomeScreen() {
     currentPosition && destination
       ? buildGoogleMapsDirectionsUrl(currentPosition, destination)
       : null;
+
+  // 景観ルートの経由地に未到達の間は、地図の目的地ピン・ルート線を経由地基準で見せる。
+  // 到達後は通常通り本来の目的地基準に切り替わる。
+  const awaitingScenicWaypoint = !!scenicWaypoint && !scenicWaypointVisited;
+  const mapDestination = awaitingScenicWaypoint ? scenicWaypoint : destination;
 
   if (phase === "ended" && summary) {
     return (
@@ -92,9 +98,9 @@ export function HomeScreen() {
     <main className="relative flex flex-1 flex-col">
       <MapView
         currentPosition={currentPosition}
-        destination={destination}
+        destination={mapDestination}
         routePolyline={
-          scenicWaypoint
+          awaitingScenicWaypoint
             ? (displayRoutePolyline ?? undefined)
             : shouldShowRouteLine
               ? lastEta?.overviewPolyline
