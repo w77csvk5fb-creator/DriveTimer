@@ -21,10 +21,7 @@ export const clientEnv = {
   firebaseProjectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
 } as const;
 
-// Vector Map(WebGL描画)は、モバイル端末でGPUメモリが逼迫した際にコンテキストロストが
-// 起こり地図が真っ白のまま操作不能になる不具合の発生源になっている。検知してのリビルドを
-// 実装済みだが再発が続くため、raster map(WebGL非依存のタイル描画)に固定して原因ごと排除する。
-export const isVectorMapConfigured = false;
+export const isVectorMapConfigured = isConfigured(clientEnv.googleMapsMapId);
 
 export const isGoogleMapsConfigured = isConfigured(clientEnv.googleMapsJsApiKey);
 

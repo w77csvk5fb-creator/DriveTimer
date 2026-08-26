@@ -10,7 +10,6 @@ import { useSettingsStore, type MapThemeMode } from "@/presentation/stores/setti
 // GPSノイズで進行方向が細かく振動しないよう、これ未満の移動では方位を更新しない
 const MIN_HEADING_UPDATE_DISTANCE_METERS = 5;
 const FOLLOW_ZOOM = 17;
-const FOLLOW_TILT = 45;
 // panTo/setHeading等のカメラ追従はVector Map上で毎回GPU再描画を伴う重い処理のため、
 // GPS更新のたびに実行すると長時間の運転で端末に大きな負荷をかける。この間隔でのみ実行する。
 const CAMERA_FOLLOW_MIN_INTERVAL_MS = 2_000;
@@ -170,10 +169,9 @@ export function MapView({
         center: currentPosition ?? destination ?? { lat: 35.681236, lng: 139.767125 },
         zoom: 13,
         disableDefaultUI: true,
-        // mapId指定時はベクターレンダリングになり、setHeading()/setTilt()およびユーザーの
-        // 回転・チルト操作が通常の道路地図上でも実際に機能するようになる(未指定時は
-        // 45度航空写真が利用可能な一部地域でしか効かない)。ダーク/ライト両方のCloud Console
-        // スタイルを同じmapIdに登録し、生成時のcolorSchemeでどちらを見せるか決める。
+        // mapId指定時はベクターレンダリングになり、setHeading()による回転が通常の道路地図上でも
+        // 実際に機能するようになる。ダーク/ライト両方のCloud Consoleスタイルを同じmapIdに
+        // 登録し、生成時のcolorSchemeでどちらを見せるか決める。
         ...(isVectorMapConfigured
           ? { mapId: clientEnv.googleMapsMapId, colorScheme: resolvedColorScheme }
           : {}),
@@ -181,7 +179,9 @@ export function MapView({
         rotateControlOptions: { position: google.maps.ControlPosition.RIGHT_BOTTOM },
         gestureHandling: "greedy",
         headingInteractionEnabled: true,
-        tiltInteractionEnabled: true,
+        // 3Dチルト(45度俯瞰)はWebGLのGPU負荷が特に高くコンテキストロストの主要因と
+        // 疑われるため無効化する。回転(heading)は平面のままでも機能するため維持する。
+        tiltInteractionEnabled: false,
       });
       applyTheme(mapRef.current, mapTheme);
       mapRef.current.addListener("dragstart", () => {
@@ -256,8 +256,8 @@ export function MapView({
       }
       lastHeadingPositionRef.current = currentPosition;
 
-      // カメラの追従(パン・ズーム・傾き・回転)はユーザーが手動操作していない間だけ行う。
-      // Vector Map上でのpanTo/setTilt/setHeadingはGPU再描画を伴う重い処理なので、
+      // カメラの追従(パン・ズーム・回転)はユーザーが手動操作していない間だけ行う。
+      // Vector Map上でのpanTo/setHeadingはGPU再描画を伴う重い処理なので、
       // GPS更新のたびに実行せず一定間隔に間引く(端末負荷・バッテリー消費の軽減)。
       const now = Date.now();
       if (following && now - lastCameraFollowAtRef.current >= CAMERA_FOLLOW_MIN_INTERVAL_MS) {
@@ -265,7 +265,6 @@ export function MapView({
         isProgrammaticUpdateRef.current = true;
         mapRef.current.panTo(currentPosition);
         mapRef.current.setZoom(FOLLOW_ZOOM);
-        mapRef.current.setTilt(FOLLOW_TILT);
         mapRef.current.setHeading(lastHeadingRef.current);
         setTimeout(() => {
           isProgrammaticUpdateRef.current = false;
@@ -334,12 +333,18 @@ export function MapView({
   }, [currentPosition, mapGeneration, waypoint, following]);
 
   useEffect(() => {
-    if (!mapRef.current || !destination || destinationMarkerRef.current) return;
-    destinationMarkerRef.current = new google.maps.Marker({
-      map: mapRef.current,
-      position: destination,
-      title: "目的地",
-    });
+    if (!mapRef.current || !destination) return;
+    // 景観ルート走行中は経由地到達までこのマーカーを経由地の位置に表示し、到達後に
+    // 呼び出し側がdestinationを本来の目的地へ差し替えるため、位置の更新にも対応する。
+    if (!destinationMarkerRef.current) {
+      destinationMarkerRef.current = new google.maps.Marker({
+        map: mapRef.current,
+        position: destination,
+        title: "目的地",
+      });
+    } else {
+      destinationMarkerRef.current.setPosition(destination);
+    }
   }, [destination, mapGeneration]);
 
   useEffect(() => {
@@ -499,7 +504,10 @@ export function MapView({
             lastCameraFollowAtRef.current = 0;
             setFollowing(true);
           }}
-          className="absolute bottom-3 right-3 rounded-full border border-outline bg-surface-raised-1 px-3 py-2 text-sm font-semibold text-on-surface shadow-lg"
+          className={`absolute right-3 rounded-full border border-outline bg-surface-raised-1 px-3 py-2 text-sm font-semibold text-on-surface shadow-lg ${
+            // fullBleed時は画面下部に操作ボタン行が重なるため、その上に余白を空けて配置する
+            fullBleed ? "bottom-24" : "bottom-3"
+          }`}
         >
           📍 現在地に戻る
         </button>
