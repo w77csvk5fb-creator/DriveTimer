@@ -19,24 +19,27 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
-// 案内文からこのステップが高速道路(有料道路含む)区間かどうかをヒューリスティックに判定するキーワード。
-// legacy Directions APIはステップ単位のhighwayフラグを返さないため、案内文の文言で近似する。
-const HIGHWAY_KEYWORDS = [
+// 案内文からこのステップが有料道路区間かどうかをヒューリスティックに判定するキーワード。
+// legacy Directions APIはステップ単位のtoll/highwayフラグを返さないため、案内文の文言で
+// 近似する。「IC」「JCT」「SA」「PA」は無料の自動車専用道路にも使われる弱いシグナルのため
+// 除外し、路線名から有料であることがほぼ確実な語だけを残す(判定精度優先)。
+const TOLL_ROAD_KEYWORDS = [
   "高速道路",
-  "高速",
   "自動車道",
   "有料道路",
   "都市高速",
   "首都高",
-  "IC",
-  "JCT",
-  "SA",
-  "PA",
+  "阪神高速",
+  "名古屋高速",
+  "福岡高速",
+  "広島高速",
+  "北九州高速",
+  "京都高速",
 ] as const;
 
-/** ステップの案内文が高速道路(有料道路含む)区間を示しているかをヒューリスティックに判定する。 */
+/** ステップの案内文が有料道路区間を示しているかをヒューリスティックに判定する。 */
 export function isHighwayInstruction(instructionText: string): boolean {
-  return HIGHWAY_KEYWORDS.some((keyword) => instructionText.includes(keyword));
+  return TOLL_ROAD_KEYWORDS.some((keyword) => instructionText.includes(keyword));
 }
 
 function keywordScore(category: DaytimeCategory, steps: readonly RouteStepSummary[]): number {

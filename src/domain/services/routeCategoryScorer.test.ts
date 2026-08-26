@@ -179,15 +179,17 @@ describe("durationFitScore", () => {
 });
 
 describe("isHighwayInstruction", () => {
-  it("returns true for instructions mentioning a highway/expressway", () => {
+  it("returns true for instructions mentioning a toll road/expressway", () => {
     expect(isHighwayInstruction("首都高速に入る")).toBe(true);
     expect(isHighwayInstruction("東名高速道路を進む")).toBe(true);
     expect(isHighwayInstruction("圏央道自動車道へ")).toBe(true);
-    expect(isHighwayInstruction("東京IC方面へ")).toBe(true);
+    expect(isHighwayInstruction("阪神高速に入る")).toBe(true);
   });
 
-  it("returns false for ordinary surface-street instructions", () => {
+  it("returns false for ordinary surface-street instructions, including free expressway interchanges", () => {
     expect(isHighwayInstruction("市街地を右折")).toBe(false);
     expect(isHighwayInstruction("海岸沿いを直進")).toBe(false);
+    // "IC"は無料の自動車専用道路にも使われる弱いシグナルのため、単独では有料道路と判定しない
+    expect(isHighwayInstruction("東京IC方面へ")).toBe(false);
   });
 });

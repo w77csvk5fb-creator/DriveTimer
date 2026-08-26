@@ -49,7 +49,7 @@ interface Survivor {
   readonly durationFitScore: number;
 }
 
-/** 案内文が高速道路区間と判定されたステップのポリラインだけを抽出する(地図プレビューの色分け用)。 */
+/** 案内文が有料道路区間と判定されたステップのポリラインだけを抽出する(地図プレビューの色分け用)。 */
 function extractHighwaySegmentPolylines(route: RouteDetail): readonly string[] {
   return route.steps
     .filter((step) => isHighwayInstruction(step.instructionText) && step.polyline !== "")

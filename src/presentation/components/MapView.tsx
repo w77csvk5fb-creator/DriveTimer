@@ -21,7 +21,7 @@ interface MapViewProps {
   readonly waypoint?: GeoPoint | null;
   /** エンコード済みポリライン。指定時、現在地から目的地までの経路を線で描画する。 */
   readonly routePolyline?: string | null;
-  /** 高速道路区間と判定されたステップのエンコード済みポリライン一覧。ルート線の上に別色で重ねる。 */
+  /** 有料道路区間と判定されたステップのエンコード済みポリライン一覧。ルート線の上に別色で重ねる。 */
   readonly highwaySegmentPolylines?: readonly string[];
   /** 到着保証モード等、緊急度の高い状態であることを示す。枠を強調し最低高さを確保する。 */
   readonly criticalMode?: boolean;
@@ -66,7 +66,7 @@ function getRouteLineColor(theme: MapThemeMode): string {
   }
 }
 
-const HIGHWAY_SEGMENT_COLOR = "#ff9800"; // 高速道路区間を示すオレンジ。通常ルート線と明確に区別する
+const HIGHWAY_SEGMENT_COLOR = "#ff9800"; // 有料道路区間を示すオレンジ。通常ルート線と明確に区別する
 
 function applyTheme(map: google.maps.Map, theme: MapThemeMode) {
   if (theme === "satellite") {
@@ -411,7 +411,7 @@ export function MapView({
     };
   }, [routePolyline, mapGeneration, mapTheme]);
 
-  // 高速道路区間(候補生成時に案内文から判定済み)を、通常のルート線の上に別色で重ねて表示する。
+  // 有料道路区間(候補生成時に案内文から判定済み)を、通常のルート線の上に別色で重ねて表示する。
   useEffect(() => {
     if (!mapRef.current) return;
     highwaySegmentPolylinesRef.current.forEach((line) => line.setMap(null));
