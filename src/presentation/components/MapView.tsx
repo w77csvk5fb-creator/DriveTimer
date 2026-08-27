@@ -112,10 +112,8 @@ export function MapView({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
   const currentMarkerRef = useRef<google.maps.Marker | null>(null);
-  const currentMarkerGlowRef = useRef<google.maps.Marker | null>(null);
   const destinationMarkerRef = useRef<google.maps.Marker | null>(null);
   const waypointMarkerRef = useRef<google.maps.Marker | null>(null);
-  const polylineGlowRef = useRef<google.maps.Polyline | null>(null);
   const polylineRef = useRef<google.maps.Polyline | null>(null);
   const highwaySegmentPolylinesRef = useRef<google.maps.Polyline[]>([]);
   const lastHeadingPositionRef = useRef<GeoPoint | null>(null);
@@ -151,16 +149,12 @@ export function MapView({
       // 破棄し、他のeffectがmapGenerationの変化を検知して新しい地図の上に作り直す。
       currentMarkerRef.current?.setMap(null);
       currentMarkerRef.current = null;
-      currentMarkerGlowRef.current?.setMap(null);
-      currentMarkerGlowRef.current = null;
       destinationMarkerRef.current?.setMap(null);
       destinationMarkerRef.current = null;
       waypointMarkerRef.current?.setMap(null);
       waypointMarkerRef.current = null;
       polylineRef.current?.setMap(null);
       polylineRef.current = null;
-      polylineGlowRef.current?.setMap(null);
-      polylineGlowRef.current = null;
       highwaySegmentPolylinesRef.current.forEach((line) => line.setMap(null));
       highwaySegmentPolylinesRef.current = [];
       containerRef.current.innerHTML = "";
@@ -182,6 +176,10 @@ export function MapView({
         // 3Dチルト(45度俯瞰)はWebGLのGPU負荷が特に高くコンテキストロストの主要因と
         // 疑われるため無効化する。回転(heading)は平面のままでも機能するため維持する。
         tiltInteractionEnabled: false,
+        // Vector Mapは高ズームレベルほど3D建物ポリゴンを大量にロード・描画するため、
+        // モバイル端末でのピンチズーム時のGPU/メモリ負荷の主要因になっていると見られる。
+        // ナビ用途で十分な詳細度(FOLLOW_ZOOM=17)は保ちつつ、それ以上の極端な詳細表示を制限する。
+        maxZoom: 19,
       });
       applyTheme(mapRef.current, mapTheme);
       mapRef.current.addListener("dragstart", () => {
@@ -271,19 +269,13 @@ export function MapView({
         }, 0);
       }
 
-      // 本体の下にひと回り大きい半透明のシアン円を重ね、グローのような立体感を出す。
-      const glowIcon: google.maps.Symbol = {
-        path: google.maps.SymbolPath.CIRCLE,
-        scale: 13,
-        fillColor: "#00e5ff",
-        fillOpacity: 0.25,
-        strokeWeight: 0,
-      };
       // SymbolのrotationはGoogle Maps APIの仕様上「画面座標系での回転」であり、
       // map.setHeading()による地図自体の回転には追従しない。そのため絶対方位から
       // 現在の地図headingを差し引き、画面上での相対角度に変換する。追従モード中は
       // 地図headingが進行方向と一致する(上のsetHeading呼び出し)ため相対角度は常に0となり、
       // 矢印は画面の真上を向き続ける(典型的なナビアプリの表示)。
+      // 以前は本体の下に半透明円を重ねてグローのような立体感を出していたが、Vector Map上での
+      // 描画オブジェクト数を減らしGPU負荷を下げるため、単一マーカーのみに絞っている。
       const mapHeading = mapRef.current.getHeading() ?? 0;
       const icon: google.maps.Symbol = {
         path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
@@ -294,17 +286,6 @@ export function MapView({
         strokeColor: "#0b0f14",
         strokeWeight: 2,
       };
-      if (!currentMarkerGlowRef.current) {
-        currentMarkerGlowRef.current = new google.maps.Marker({
-          map: mapRef.current,
-          position: currentPosition,
-          icon: glowIcon,
-          zIndex: 1,
-          clickable: false,
-        });
-      } else {
-        currentMarkerGlowRef.current.setPosition(currentPosition);
-      }
       if (!currentMarkerRef.current) {
         currentMarkerRef.current = new google.maps.Marker({
           map: mapRef.current,
@@ -371,34 +352,22 @@ export function MapView({
     if (!routePolyline) {
       polylineRef.current?.setMap(null);
       polylineRef.current = null;
-      polylineGlowRef.current?.setMap(null);
-      polylineGlowRef.current = null;
       return;
     }
     let cancelled = false;
     void importLibrary("geometry").then(({ encoding }) => {
       if (cancelled || !mapRef.current) return;
       const path = encoding.decodePath(routePolyline);
-      // 太く薄いシアンの線を下に敷き、その上に本線を重ねてグローのような立体感を出す。
-      if (!polylineGlowRef.current) {
-        polylineGlowRef.current = new google.maps.Polyline({
-          map: mapRef.current,
-          path,
-          strokeColor: "#00e5ff",
-          strokeOpacity: 0.25,
-          strokeWeight: 11,
-          zIndex: 1,
-        });
-      } else {
-        polylineGlowRef.current.setPath(path);
-      }
+      // 以前は太く薄いシアンの線を下に敷いてグローのような立体感を出していたが、
+      // Vector Map上での描画オブジェクト数を減らしGPU負荷を下げるため単線のみにし、
+      // その分視認性を保てるようstrokeWeightを太くしている。
       if (!polylineRef.current) {
         polylineRef.current = new google.maps.Polyline({
           map: mapRef.current,
           path,
           strokeColor: getRouteLineColor(mapTheme),
           strokeOpacity: 0.95,
-          strokeWeight: 5,
+          strokeWeight: 6,
           zIndex: 2,
         });
       } else {
