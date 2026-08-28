@@ -400,14 +400,18 @@ export const useActiveDriveStore = create<ActiveDriveState>((set, get) => ({
         arrivalGuaranteeModeTriggered: runtime.arrivalGuaranteeModeTriggered,
       });
 
-      // 表示専用: 選んだ景観ルートの経由地がある間は、その経路のポリラインも取得する。
-      // 失敗しても安全計算には無関係のため無視する(直前の表示を保持)。
-      if (state.scenicWaypoint && runtime.directionsRepository) {
+      // 表示専用: 景観ルートの経由地に未到達の間、そこまでの経路のポリラインを取得する。
+      // 目的地までの区間を含めてしまうと地図上のルート線が経由地を素通りして目的地まで
+      // 伸びて見えてしまうため、経由地までの直行ルートだけを取得する(経由地までの
+      // 実際の道のりを見せたいだけで、その先の景観性は問わない)。到達後は
+      // awaitingScenicWaypointがfalseになりHomeScreen側で参照されなくなるため、
+      // 無駄なAPI呼び出しを避けて取得自体をやめる。失敗時は安全計算には無関係のため
+      // 無視する(直前の表示を保持)。
+      if (state.scenicWaypoint && !runtime.scenicWaypointVisited && runtime.directionsRepository) {
         try {
-          const displayRoute = await runtime.directionsRepository.getRouteViaWaypoint(
+          const displayRoute = await runtime.directionsRepository.getTrafficAwareEta(
             position,
             state.scenicWaypoint,
-            state.destination,
           );
           set({ displayRoutePolyline: displayRoute.overviewPolyline });
         } catch {
