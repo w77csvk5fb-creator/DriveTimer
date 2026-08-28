@@ -34,6 +34,15 @@ export function bearingBetween(from: GeoPoint, to: GeoPoint): number {
   return (bearingDeg + 360) % 360;
 }
 
+/**
+ * Web Mercator図法での「地図上1ピクセルあたりの実距離(m)」を求める(タイル256px基準)。
+ * 走行中の追従カメラで、画面上部を覆うオーバーレイの高さ分だけ地図の中心をずらす際、
+ * ピクセル単位のオフセットを緯度経度のオフセットに変換するために使う。
+ */
+export function metersPerPixel(latitude: number, zoom: number): number {
+  return (156_543.03392 * Math.cos(toRad(latitude))) / 2 ** zoom;
+}
+
 /** originから指定した方位(度、北=0、時計回り)・距離(m)だけ離れた地点を球面近似で求める */
 export function destinationPoint(
   origin: GeoPoint,

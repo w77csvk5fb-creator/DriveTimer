@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
 import { useActiveDriveStore } from "@/presentation/stores/activeDriveStore";
 import { RiskBanner } from "@/presentation/components/RiskBanner";
 import { MapView } from "@/presentation/components/MapView";
@@ -54,6 +55,21 @@ export function HomeScreen() {
   const awaitingScenicWaypoint =
     !!scenicWaypoint && !scenicWaypointVisited && !arrivalGuaranteeModeTriggered;
   const mapDestination = awaitingScenicWaypoint ? scenicWaypoint : destination;
+
+  // 画面上部の状態オーバーレイが実際に占める高さ(画面上端からの距離)を計測し、MapViewへ
+  // 渡す。走行中の追従カメラがこの分だけ地図中心をずらし、現在地が見た目の実質的な
+  // 中央(オーバーレイの下の空き領域の中央)に来るようにするため。
+  const topOverlayRef = useRef<HTMLDivElement | null>(null);
+  const [topOverlayHeight, setTopOverlayHeight] = useState(0);
+  useEffect(() => {
+    const el = topOverlayRef.current;
+    if (!el) return;
+    const updateHeight = () => setTopOverlayHeight(el.getBoundingClientRect().bottom);
+    updateHeight();
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   if (phase === "ended" && summary) {
     return (
@@ -111,11 +127,15 @@ export function HomeScreen() {
         }
         criticalMode={isRedTone}
         fullBleed
+        centerOffsetTopPx={topOverlayHeight}
       />
 
       {/* 地図上部: 状態バナー類を半透明オーバーレイとして重ねる。左上のテーマ切替ピルと
           被らないよう、その高さ分だけ空けて開始する。 */}
-      <div className="pointer-events-none absolute inset-x-3 top-16 z-10 flex flex-col gap-2">
+      <div
+        ref={topOverlayRef}
+        className="pointer-events-none absolute inset-x-3 top-16 z-10 flex flex-col gap-2"
+      >
         {!wakeLockActive && <WakeLockWarningBanner />}
         {locationError && <LocationErrorBanner error={locationError} />}
         {directionsError && (

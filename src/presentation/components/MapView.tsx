@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { importLibrary, setOptions } from "@googlemaps/js-api-loader";
 import type { GeoPoint } from "@/domain/entities/geoPoint";
 import { clientEnv, isGoogleMapsConfigured, isVectorMapConfigured } from "@/core/config/env";
-import { bearingBetween, haversineDistanceMeters } from "@/core/utils/geoUtils";
+import { bearingBetween, destinationPoint, haversineDistanceMeters, metersPerPixel } from "@/core/utils/geoUtils";
 import { useSettingsStore, type MapThemeMode } from "@/presentation/stores/settingsStore";
 
 // GPSノイズで進行方向が細かく振動しないよう、これ未満の移動では方位を更新しない
@@ -27,6 +27,12 @@ interface MapViewProps {
   readonly criticalMode?: boolean;
   /** true時、角丸・枠線を無くし画面いっぱいに敷き詰める(走行中のホーム画面用)。 */
   readonly fullBleed?: boolean;
+  /**
+   * 走行中の追従時、地図中心をこのピクセル数の半分だけ進行方向側にオフセットする。
+   * 画面上部を覆う状態オーバーレイの高さ分、現在地マーカーが画面の見た目上の中央から
+   * 上にずれて見えてしまうのを補正するために使う(呼び出し側がオーバーレイの実測高さを渡す)。
+   */
+  readonly centerOffsetTopPx?: number;
 }
 
 // トヨタ/レクサス的な黒基調ナビ画面に寄せたダークスタイル。
@@ -105,6 +111,7 @@ export function MapView({
   highwaySegmentPolylines,
   criticalMode = false,
   fullBleed = false,
+  centerOffsetTopPx = 0,
 }: MapViewProps) {
   const mapTheme = useSettingsStore((s) => s.mapTheme);
   const setMapTheme = useSettingsStore((s) => s.setMapTheme);
@@ -261,7 +268,19 @@ export function MapView({
       if (following && now - lastCameraFollowAtRef.current >= CAMERA_FOLLOW_MIN_INTERVAL_MS) {
         lastCameraFollowAtRef.current = now;
         isProgrammaticUpdateRef.current = true;
-        mapRef.current.panTo(currentPosition);
+        // 地図中心をそのまま現在地にすると、画面上部を覆う状態オーバーレイの分だけ、
+        // 実際に見えている地図の中では現在地が中央より上寄りに表示されてしまう。
+        // オーバーレイ高さの半分だけ進行方向(=画面上方向)にずらした地点を中心にすることで、
+        // 現在地が見た目上の実質的な中央(オーバーレイの下の空き領域の中央)に来るようにする。
+        const panTarget =
+          centerOffsetTopPx > 0
+            ? destinationPoint(
+                currentPosition,
+                lastHeadingRef.current,
+                (centerOffsetTopPx / 2) * metersPerPixel(currentPosition.lat, FOLLOW_ZOOM),
+              )
+            : currentPosition;
+        mapRef.current.panTo(panTarget);
         mapRef.current.setZoom(FOLLOW_ZOOM);
         mapRef.current.setHeading(lastHeadingRef.current);
         setTimeout(() => {
@@ -311,7 +330,7 @@ export function MapView({
     } else {
       currentMarkerRef.current.setPosition(currentPosition);
     }
-  }, [currentPosition, mapGeneration, waypoint, following]);
+  }, [currentPosition, mapGeneration, waypoint, following, centerOffsetTopPx]);
 
   useEffect(() => {
     if (!mapRef.current || !destination) return;
