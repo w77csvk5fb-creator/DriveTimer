@@ -121,7 +121,10 @@ export function HomeScreen() {
         routePolyline={
           awaitingScenicWaypoint
             ? (displayRoutePolyline ?? undefined)
-            : shouldShowRouteLine
+            : // 景観ルートを選んで走行中の間(経由地に到達済みでも「今すぐ折り返す」で
+              // scenicWaypointが破棄されるまで)は、リスクレベルに関わらず常に目的地までの
+              // ルート線を表示する。景観ルート由来でなければ従来通りwarning以上でのみ表示する。
+              scenicWaypoint || shouldShowRouteLine
               ? lastEta?.overviewPolyline
               : undefined
         }
